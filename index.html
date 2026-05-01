@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TableSet | Recipe Importer & Weekly Planner</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <div class="hero-badge-row">
+            <p class="eyebrow">Recipe library + weekly meal planning</p>
+            <span class="season-tag">Kitchen notebook</span>
+          </div>
+          <h1>Turn recipe links into a warm, lived-in food plan.</h1>
+          <p class="hero-text">
+            Keep the recipes you love, shape a week of comforting meals, and let the
+            shopping list gather itself as your table starts to take shape.
+          </p>
+          <div class="hero-notes">
+            <div class="hero-note">
+              <span class="hero-note-label">This week</span>
+              <strong>Choose dinners for every day</strong>
+            </div>
+            <div class="hero-note">
+              <span class="hero-note-label">Shopping</span>
+              <strong>Shared ingredients merge together</strong>
+            </div>
+          </div>
+          <div class="hero-actions">
+            <button id="share-board-button" class="ghost-button" type="button">Create share link</button>
+            <p id="share-status" class="status-text" aria-live="polite"></p>
+          </div>
+        </div>
+        <div class="hero-stat-grid">
+          <section class="hero-stat">
+            <span class="stat-label">Recipes saved</span>
+            <strong id="recipe-count">0</strong>
+          </section>
+          <section class="hero-stat">
+            <span class="stat-label">Meals planned</span>
+            <strong id="planned-count">0</strong>
+          </section>
+          <section class="hero-stat">
+            <span class="stat-label">Shopping items</span>
+            <strong id="shopping-count">0</strong>
+          </section>
+          <section class="hero-card">
+            <p>Built to feel like a recipe box, meal board, and handwritten shopping list in one place.</p>
+          </section>
+        </div>
+      </header>
+
+      <main class="main-grid">
+        <section class="panel import-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="kicker">Import recipe</p>
+              <h2>Bring in a recipe URL</h2>
+            </div>
+            <button id="load-demo-button" class="ghost-button" type="button">Load demo recipes</button>
+          </div>
+
+          <form id="import-form" class="import-form">
+            <label class="field">
+              <span>Recipe URL</span>
+              <input
+                id="recipe-url"
+                name="recipeUrl"
+                type="url"
+                placeholder="https://example.com/recipes/roast-veg-pasta"
+                required
+              />
+            </label>
+
+            <label class="field">
+              <span>Optional page HTML fallback</span>
+              <textarea
+                id="recipe-html"
+                name="recipeHtml"
+                rows="6"
+                placeholder="Paste page HTML here if the source site blocks direct fetching."
+              ></textarea>
+            </label>
+
+            <div class="import-actions">
+              <button class="primary-button" type="submit">Import recipe</button>
+              <p id="import-status" class="status-text" aria-live="polite"></p>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel planner-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="kicker">Meal planner</p>
+              <h2>Plan the week</h2>
+            </div>
+          </div>
+
+          <div id="weekly-menu" class="weekly-menu"></div>
+        </section>
+
+        <section class="library-column">
+          <section class="panel library-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="kicker">Recipe library</p>
+                <h2>Your saved recipes</h2>
+              </div>
+            </div>
+            <div id="recipe-library" class="recipe-library"></div>
+          </section>
+
+          <section class="panel shopping-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="kicker">Shopping list</p>
+                <h2>Auto-generated ingredients</h2>
+              </div>
+            </div>
+            <div id="shopping-list" class="shopping-list"></div>
+          </section>
+        </section>
+
+        <section class="panel details-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="kicker">Recipe page</p>
+              <h2>Stored recipe details</h2>
+            </div>
+          </div>
+          <article id="recipe-detail" class="recipe-detail empty-state">
+            Import a recipe or choose one from your library to see ingredients, instructions,
+            and method here.
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <template id="recipe-card-template">
+      <button class="recipe-card" type="button">
+        <span class="recipe-card-title"></span>
+        <span class="recipe-card-meta"></span>
+      </button>
+    </template>
+
+    <template id="shopping-item-template">
+      <li class="shopping-item">
+        <span class="shopping-item-name"></span>
+        <span class="shopping-item-count"></span>
+      </li>
+    </template>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
