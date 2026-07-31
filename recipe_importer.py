@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import re
 import socket
 from urllib.parse import urljoin, urlparse
 
@@ -108,6 +109,7 @@ def extract_recipe_from_json_ld(soup: BeautifulSoup, source_url: str) -> dict | 
     description = normalize_text(recipe_node.get("description"))
     title = normalize_text(recipe_node.get("name")) or infer_title_from_url(source_url)
     image = normalize_image(recipe_node.get("image"))
+    servings = extract_servings(recipe_node.get("recipeYield"))
 
     return {
         "title": title,
@@ -117,6 +119,7 @@ def extract_recipe_from_json_ld(soup: BeautifulSoup, source_url: str) -> dict | 
         "instructions": instructions,
         "method": " ".join(instructions),
         "image": image,
+        "servings": servings,
     }
 
 
@@ -137,6 +140,7 @@ def extract_recipe_from_visible_html(soup: BeautifulSoup, source_url: str) -> di
         "instructions": instructions,
         "method": " ".join(instructions),
         "image": "",
+        "servings": None,
     }
 
 
@@ -237,6 +241,20 @@ def normalize_image(raw: object) -> str:
     return ""
 
 
+def extract_servings(raw: object) -> int | None:
+    """recipeYield can be "4", "4 servings", or a list of those; pull the first number out."""
+    if raw is None:
+        return None
+
+    values = raw if isinstance(raw, list) else [raw]
+    for value in values:
+        match = re.search(r"\d+", str(value))
+        if match:
+            return int(match.group())
+
+    return None
+
+
 def infer_title_from_url(url: str) -> str:
     try:
         path = [part for part in urlparse(url).path.split("/") if part][-1]
@@ -247,4 +265,5 @@ def infer_title_from_url(url: str) -> str:
 
 
 def normalize_text(value: object) -> str:
-    return str(value or "").replace("\xa0", " ").strip()
+    text = str(value or "").replace("\xa0", " ")
+    return re.sub(r"\s+", " ", text).strip()

@@ -1,3 +1,14 @@
+import {
+  parseIngredient,
+  createIngredientEntry,
+  mergeIngredientEntry,
+  formatIngredientSummary,
+  groupShoppingItems,
+  scaleIngredientText,
+} from "./ingredients.js";
+import { extractRecipeFromHtml } from "./recipe-parser.js";
+import { encodeSharedPayload, decodeSharedPayload } from "./share.js";
+
 const STORAGE_KEYS = {
   recipes: "tableset-recipes",
   planner: "tableset-planner",
@@ -14,269 +25,13 @@ const WEEK_DAYS = [
   "Sunday",
 ];
 
-const SHOPPING_CATEGORIES = [
-  {
-    label: "Fresh Fruit & Veg",
-    matches: [
-      "apple",
-      "apricot",
-      "arugula",
-      "asparagus",
-      "avocado",
-      "basil",
-      "bell pepper",
-      "berry",
-      "broccoli",
-      "cabbage",
-      "capsicum",
-      "carrot",
-      "cauliflower",
-      "celery",
-      "chili",
-      "cilantro",
-      "coriander",
-      "courgette",
-      "cucumber",
-      "eggplant",
-      "garlic",
-      "ginger",
-      "grape",
-      "herb",
-      "kale",
-      "leek",
-      "lemon",
-      "lettuce",
-      "lime",
-      "mango",
-      "mushroom",
-      "onion",
-      "orange",
-      "parsley",
-      "pear",
-      "pepper",
-      "pineapple",
-      "potato",
-      "rocket",
-      "salad",
-      "scallion",
-      "spinach",
-      "spring onion",
-      "tomato",
-      "zucchini",
-    ],
-  },
-  {
-    label: "Fridge & Dairy",
-    matches: [
-      "butter",
-      "cheese",
-      "cream",
-      "creme fraiche",
-      "egg",
-      "feta",
-      "halloumi",
-      "milk",
-      "mozzarella",
-      "parmesan",
-      "yogurt",
-      "yoghurt",
-    ],
-  },
-  {
-    label: "Meat & Fish",
-    matches: [
-      "beef",
-      "bacon",
-      "chicken",
-      "ham",
-      "lamb",
-      "pork",
-      "prawn",
-      "salmon",
-      "sausage",
-      "shrimp",
-      "steak",
-      "turkey",
-      "tuna",
-    ],
-  },
-  {
-    label: "Frozen",
-    matches: ["frozen", "ice cream", "peas", "sweetcorn", "hash brown"],
-  },
-  {
-    label: "Bakery",
-    matches: ["bread", "bun", "roll", "pitta", "tortilla", "wrap", "bagel"],
-  },
-  {
-    label: "Cupboard",
-    matches: [],
-  },
-];
-
-const INGREDIENT_SYNONYMS = [
-  {
-    canonical: "cajun seasoning",
-    matches: ["cajun seasoning", "cajun spice mix", "cajun spice blend"],
-  },
-  {
-    canonical: "paprika",
-    matches: [
-      "paprika",
-      "ground paprika",
-      "sweet paprika",
-      "smoked paprika",
-      "sweet smoked paprika",
-    ],
-  },
-  {
-    canonical: "chili powder",
-    matches: ["chili powder", "chilli powder", "ground chili", "ground chilli"],
-  },
-  {
-    canonical: "red pepper flakes",
-    matches: ["red pepper flakes", "chilli flakes", "chili flakes", "crushed red pepper"],
-  },
-  {
-    canonical: "cilantro",
-    matches: ["cilantro", "coriander leaves", "fresh coriander", "coriander leaf"],
-  },
-  {
-    canonical: "scallions",
-    matches: ["scallions", "spring onions", "green onions"],
-  },
-  {
-    canonical: "bell pepper",
-    matches: ["bell pepper", "capsicum"],
-  },
-  {
-    canonical: "zucchini",
-    matches: ["zucchini", "courgette"],
-  },
-  {
-    canonical: "eggplant",
-    matches: ["eggplant", "aubergine"],
-  },
-  {
-    canonical: "arugula",
-    matches: ["arugula", "rocket"],
-  },
-  {
-    canonical: "garbanzo beans",
-    matches: ["garbanzo beans", "chickpeas"],
-  },
-  {
-    canonical: "confectioners sugar",
-    matches: ["confectioners sugar", "powdered sugar", "icing sugar"],
-  },
-  {
-    canonical: "cornstarch",
-    matches: ["cornstarch", "cornflour"],
-  },
-  {
-    canonical: "plain flour",
-    matches: ["plain flour", "all purpose flour", "all-purpose flour"],
-  },
-  {
-    canonical: "baking soda",
-    matches: ["baking soda", "bicarbonate of soda", "bicarb"],
-  },
-  {
-    canonical: "baking powder",
-    matches: ["baking powder", "raising powder"],
-  },
-  {
-    canonical: "heavy cream",
-    matches: ["heavy cream", "double cream"],
-  },
-  {
-    canonical: "whipping cream",
-    matches: ["whipping cream", "single cream"],
-  },
-  {
-    canonical: "yogurt",
-    matches: ["yogurt", "yoghurt", "greek yogurt", "greek yoghurt"],
-  },
-  {
-    canonical: "mozzarella",
-    matches: ["mozzarella", "fresh mozzarella"],
-  },
-  {
-    canonical: "parmesan",
-    matches: ["parmesan", "parmigiano reggiano"],
-  },
-  {
-    canonical: "canned tomatoes",
-    matches: [
-      "canned tomatoes",
-      "can tomatoes",
-      "tinned tomatoes",
-      "tin tomatoes",
-      "chopped tomatoes",
-      "whole tomatoes",
-      "peeled tomatoes",
-      "plum tomatoes",
-      "diced tomatoes",
-      "tomatoes",
-    ],
-  },
-  {
-    canonical: "passata",
-    matches: ["passata", "tomato puree", "tomato purée"],
-  },
-  {
-    canonical: "broth",
-    matches: ["broth", "stock"],
-  },
-  {
-    canonical: "shrimp",
-    matches: ["shrimp", "prawns"],
-  },
-  {
-    canonical: "ground beef",
-    matches: ["ground beef", "minced beef", "beef mince"],
-  },
-  {
-    canonical: "ground pork",
-    matches: ["ground pork", "pork mince", "minced pork"],
-  },
-  {
-    canonical: "ground turkey",
-    matches: ["ground turkey", "turkey mince", "minced turkey"],
-  },
-  {
-    canonical: "chicken breast",
-    matches: [
-      "chicken breast",
-      "chicken breasts",
-      "skinless chicken breast",
-      "skinless chicken breasts",
-      "boneless chicken breast",
-      "boneless chicken breasts",
-      "skinless boneless chicken breast",
-      "skinless boneless chicken breasts",
-    ],
-  },
-  {
-    canonical: "soda water",
-    matches: ["soda water", "sparkling water"],
-  },
-  {
-    canonical: "caster sugar",
-    matches: ["caster sugar", "superfine sugar"],
-  },
-  {
-    canonical: "brown sugar",
-    matches: ["brown sugar", "light brown sugar", "soft brown sugar"],
-  },
-];
-
 const demoRecipes = [
   {
     id: crypto.randomUUID(),
     title: "One-Pan Tomato Basil Gnocchi",
     sourceUrl: "https://demo.local/gnocchi",
     description: "A quick weeknight pasta-style dinner with soft gnocchi and tomato sauce.",
+    servings: 4,
     ingredients: [
       "500g shelf-stable gnocchi",
       "2 tbsp olive oil",
@@ -302,6 +57,7 @@ const demoRecipes = [
     title: "Coconut Chickpea Curry",
     sourceUrl: "https://demo.local/chickpea-curry",
     description: "Comforting curry with pantry ingredients and a bright finish.",
+    servings: 4,
     ingredients: [
       "1 tbsp coconut oil",
       "1 onion, diced",
@@ -327,6 +83,18 @@ const demoRecipes = [
 ];
 
 const elements = {
+  appShell: document.querySelector("#app-shell"),
+  authPanel: document.querySelector("#auth-panel"),
+  authForm: document.querySelector("#auth-form"),
+  authEmail: document.querySelector("#auth-email"),
+  authPassword: document.querySelector("#auth-password"),
+  authStatus: document.querySelector("#auth-status"),
+  authSubmit: document.querySelector("#auth-submit"),
+  authHeading: document.querySelector("#auth-heading"),
+  authToggleMode: document.querySelector("#auth-toggle-mode"),
+  userBar: document.querySelector("#user-bar"),
+  userEmail: document.querySelector("#user-email"),
+  logoutButton: document.querySelector("#logout-button"),
   importForm: document.querySelector("#import-form"),
   recipeUrl: document.querySelector("#recipe-url"),
   recipeHtml: document.querySelector("#recipe-html"),
@@ -345,26 +113,46 @@ const elements = {
   shoppingItemTemplate: document.querySelector("#shopping-item-template"),
 };
 
+const IS_HOSTED_APP = window.location.protocol !== "file:";
+
 let state = {
-  recipes: readJson(STORAGE_KEYS.recipes, []),
-  planner: readJson(
-    STORAGE_KEYS.planner,
-    WEEK_DAYS.reduce((days, day) => ({ ...days, [day]: "" }), {})
-  ),
-  selectedRecipeId: localStorage.getItem(STORAGE_KEYS.selectedRecipeId) || "",
+  user: null,
+  recipes: IS_HOSTED_APP ? [] : readJson(STORAGE_KEYS.recipes, []),
+  planner: IS_HOSTED_APP
+    ? WEEK_DAYS.reduce((days, day) => ({ ...days, [day]: "" }), {})
+    : readJson(
+        STORAGE_KEYS.planner,
+        WEEK_DAYS.reduce((days, day) => ({ ...days, [day]: "" }), {})
+      ),
+  selectedRecipeId: IS_HOSTED_APP ? "" : localStorage.getItem(STORAGE_KEYS.selectedRecipeId) || "",
+  editingRecipeId: null,
+  desiredServings: null,
 };
 
-const IS_HOSTED_APP = window.location.protocol !== "file:";
+let authMode = "login";
 
 initializeApp();
 
 async function initializeApp() {
+  bindEvents();
+
   if (IS_HOSTED_APP) {
+    const user = await fetchCurrentUser();
+    if (!user) {
+      showAuth();
+      return;
+    }
+    state.user = user;
+    showApp();
     await hydrateRemoteState();
   } else {
     await hydrateSharedState();
   }
 
+  finishInitialRender();
+}
+
+function finishInitialRender() {
   if (!Object.keys(state.planner).length) {
     state.planner = WEEK_DAYS.reduce((days, day) => ({ ...days, [day]: "" }), {});
   }
@@ -376,7 +164,6 @@ async function initializeApp() {
     state.selectedRecipeId = state.recipes[0].id;
   }
 
-  bindEvents();
   render();
 }
 
@@ -384,6 +171,102 @@ function bindEvents() {
   elements.importForm.addEventListener("submit", handleImportSubmit);
   elements.loadDemoButton.addEventListener("click", handleLoadDemoRecipes);
   elements.shareBoardButton.addEventListener("click", handleShareBoard);
+  elements.authForm.addEventListener("submit", handleAuthSubmit);
+  elements.authToggleMode.addEventListener("click", handleAuthToggleMode);
+  elements.logoutButton.addEventListener("click", handleLogout);
+}
+
+function showApp() {
+  elements.appShell.classList.remove("hidden");
+  elements.authPanel.classList.add("hidden");
+  elements.userBar.classList.remove("hidden");
+  elements.userEmail.textContent = state.user?.email || "";
+}
+
+function showAuth() {
+  elements.appShell.classList.add("hidden");
+  elements.authPanel.classList.remove("hidden");
+  elements.userBar.classList.add("hidden");
+}
+
+async function fetchCurrentUser() {
+  try {
+    const response = await fetch("/api/auth/me", { credentials: "same-origin" });
+    const payload = await response.json().catch(() => ({}));
+    return payload.user || null;
+  } catch (error) {
+    return null;
+  }
+}
+
+async function handleAuthSubmit(event) {
+  event.preventDefault();
+  const email = elements.authEmail.value.trim();
+  const password = elements.authPassword.value;
+  const endpoint = authMode === "register" ? "/api/auth/register" : "/api/auth/login";
+
+  setAuthStatus(authMode === "register" ? "Creating your account..." : "Signing in...");
+
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ email, password }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.error || "Could not sign in.");
+    }
+
+    state.user = payload.user;
+    elements.authForm.reset();
+    setAuthStatus("");
+    showApp();
+    await hydrateRemoteState();
+    finishInitialRender();
+  } catch (error) {
+    setAuthStatus(error.message || "Could not sign in.");
+  }
+}
+
+function handleAuthToggleMode() {
+  authMode = authMode === "login" ? "register" : "login";
+  const isRegister = authMode === "register";
+  elements.authHeading.textContent = isRegister
+    ? "Create your meal board account"
+    : "Sign in to your meal board";
+  elements.authSubmit.textContent = isRegister ? "Create account" : "Sign in";
+  elements.authToggleMode.textContent = isRegister
+    ? "Already have an account? Sign in"
+    : "Need an account? Register";
+  elements.authPassword.setAttribute("autocomplete", isRegister ? "new-password" : "current-password");
+  setAuthStatus("");
+}
+
+async function handleLogout() {
+  try {
+    await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+  } catch (error) {
+    // Fall through and clear local state even if the network call failed.
+  }
+
+  state.user = null;
+  state.recipes = [];
+  state.planner = WEEK_DAYS.reduce((days, day) => ({ ...days, [day]: "" }), {});
+  state.selectedRecipeId = "";
+  state.editingRecipeId = null;
+  state.desiredServings = null;
+  showAuth();
+}
+
+async function hostedFetch(path, options = {}) {
+  const response = await fetch(path, { ...options, credentials: "same-origin" });
+  if (response.status === 401) {
+    state.user = null;
+    showAuth();
+  }
+  return response;
 }
 
 async function handleImportSubmit(event) {
@@ -411,7 +294,7 @@ async function handleImportSubmit(event) {
 async function handleLoadDemoRecipes() {
   if (IS_HOSTED_APP) {
     try {
-      const response = await fetch("/api/recipes/bulk", {
+      const response = await hostedFetch("/api/recipes/bulk", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -467,7 +350,7 @@ async function handleShareBoard() {
       await navigator.clipboard.writeText(shareUrl);
       setShareStatus(
         IS_HOSTED_APP
-          ? "Live link copied. Anyone opening it will see the shared meal board."
+          ? "Live link copied. Anyone signed in will see the shared meal board."
           : "Share link copied. Anyone opening it will see this recipe board."
       );
       return;
@@ -489,11 +372,11 @@ async function importRecipeFromUrl(url) {
   }
 
   const html = await fetchRecipeMarkup(url);
-  return extractRecipeFromHtml(html, url);
+  return extractRecipeFromHtml(new DOMParser().parseFromString(html, "text/html"), url);
 }
 
 async function importRecipeViaEndpoint(url) {
-  const response = await fetch("/api/import-recipe", {
+  const response = await hostedFetch("/api/import-recipe", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -518,10 +401,11 @@ async function importRecipeViaEndpoint(url) {
 
 async function saveRecipeHtml(html, sourceUrl) {
   if (!IS_HOSTED_APP) {
-    return extractRecipeFromHtml(html, sourceUrl);
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    return extractRecipeFromHtml(doc, sourceUrl);
   }
 
-  const response = await fetch("/api/recipes", {
+  const response = await hostedFetch("/api/recipes", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -551,220 +435,6 @@ async function fetchRecipeMarkup(url) {
   );
 }
 
-function extractRecipeFromHtml(html, sourceUrl) {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, "text/html");
-  const jsonLdScripts = Array.from(
-    doc.querySelectorAll('script[type="application/ld+json"]')
-  );
-
-  const candidateRecipes = jsonLdScripts
-    .flatMap((script) => parseJsonLd(script.textContent))
-    .flatMap(flattenJsonLdNodes)
-    .filter((entry) => isRecipeNode(entry));
-
-  const recipeNode = candidateRecipes[0];
-
-  if (!recipeNode) {
-    return extractRecipeFromVisibleHtml(doc, sourceUrl);
-  }
-
-  const instructions = normalizeInstructions(recipeNode.recipeInstructions);
-  const ingredients = normalizeStringList(recipeNode.recipeIngredient);
-  const description = normalizeText(recipeNode.description);
-  const title = normalizeText(recipeNode.name) || inferTitleFromUrl(sourceUrl);
-  const image = normalizeImage(recipeNode.image);
-
-  return {
-    id: crypto.randomUUID(),
-    title,
-    sourceUrl,
-    description,
-    ingredients,
-    instructions,
-    method: instructions.join(" "),
-    image,
-    importedAt: new Date().toISOString(),
-  };
-}
-
-function extractRecipeFromVisibleHtml(doc, sourceUrl) {
-  const title =
-    normalizeText(doc.querySelector("h1")?.textContent) || inferTitleFromUrl(sourceUrl);
-  const ingredients = gatherListAfterHeading(doc, ["ingredients"]);
-  const instructions = gatherListAfterHeading(doc, [
-    "instructions",
-    "method",
-    "directions",
-    "preparation",
-  ]);
-  const description = normalizeText(
-    doc.querySelector('meta[name="description"]')?.getAttribute("content")
-  );
-
-  return {
-    id: crypto.randomUUID(),
-    title,
-    sourceUrl,
-    description,
-    ingredients,
-    instructions,
-    method: instructions.join(" "),
-    image: "",
-    importedAt: new Date().toISOString(),
-  };
-}
-
-function gatherListAfterHeading(doc, keywords) {
-  const headings = Array.from(doc.querySelectorAll("h1, h2, h3, h4, strong, b"));
-  const match = headings.find((heading) => {
-    const text = normalizeText(heading.textContent).toLowerCase();
-    return keywords.some((keyword) => text === keyword || text.includes(keyword));
-  });
-
-  if (!match) {
-    return [];
-  }
-
-  let sibling = match.nextElementSibling;
-  while (sibling) {
-    if (["UL", "OL"].includes(sibling.tagName)) {
-      return Array.from(sibling.querySelectorAll("li"))
-        .map((item) => normalizeText(item.textContent))
-        .filter(Boolean);
-    }
-
-    if (sibling.tagName === "P") {
-      const lines = sibling.textContent
-        .split(/\n|\. /)
-        .map((line) => normalizeText(line))
-        .filter(Boolean);
-      if (lines.length) {
-        return lines;
-      }
-    }
-
-    sibling = sibling.nextElementSibling;
-  }
-
-  return [];
-}
-
-function parseJsonLd(text) {
-  if (!text) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(text);
-    return Array.isArray(parsed) ? parsed : [parsed];
-  } catch (error) {
-    return [];
-  }
-}
-
-function flattenJsonLdNodes(node) {
-  if (!node) {
-    return [];
-  }
-
-  const graph = Array.isArray(node["@graph"]) ? node["@graph"] : [];
-  return [node, ...graph];
-}
-
-function isRecipeNode(node) {
-  const type = node["@type"];
-  if (Array.isArray(type)) {
-    return type.includes("Recipe");
-  }
-  return type === "Recipe";
-}
-
-function normalizeInstructions(input) {
-  if (!input) {
-    return [];
-  }
-
-  if (Array.isArray(input)) {
-    return input
-      .flatMap((entry) => {
-        if (typeof entry === "string") {
-          return [entry];
-        }
-
-        if (entry?.text) {
-          return [entry.text];
-        }
-
-        if (Array.isArray(entry?.itemListElement)) {
-          return entry.itemListElement.map((item) => item.text || "");
-        }
-
-        return [];
-      })
-      .map((entry) => normalizeText(entry))
-      .filter(Boolean);
-  }
-
-  if (typeof input === "string") {
-    return input
-      .split(/\n+/)
-      .map((entry) => normalizeText(entry))
-      .filter(Boolean);
-  }
-
-  return [];
-}
-
-function normalizeStringList(input) {
-  if (!input) {
-    return [];
-  }
-
-  return (Array.isArray(input) ? input : [input])
-    .map((entry) => normalizeText(String(entry)))
-    .filter(Boolean);
-}
-
-function normalizeImage(image) {
-  if (!image) {
-    return "";
-  }
-
-  if (typeof image === "string") {
-    return image;
-  }
-
-  if (Array.isArray(image)) {
-    return typeof image[0] === "string" ? image[0] : image[0]?.url || "";
-  }
-
-  return image.url || "";
-}
-
-function normalizeText(value) {
-  return String(value || "")
-    .replace(/\s+/g, " ")
-    .replace(/\u00a0/g, " ")
-    .trim();
-}
-
-function inferTitleFromUrl(url) {
-  try {
-    const path = new URL(url).pathname
-      .split("/")
-      .filter(Boolean)
-      .pop();
-    return path
-      ? path
-          .replace(/[-_]/g, " ")
-          .replace(/\b\w/g, (letter) => letter.toUpperCase())
-      : "Imported Recipe";
-  } catch (error) {
-    return "Imported Recipe";
-  }
-}
-
 function upsertRecipe(recipe) {
   const existing = state.recipes.find((entry) => entry.sourceUrl === recipe.sourceUrl);
 
@@ -776,13 +446,123 @@ function upsertRecipe(recipe) {
     state.selectedRecipeId = recipe.id;
   }
 
+  state.desiredServings = null;
   persistState();
   render();
 }
 
+function handleSelectRecipe(recipeId) {
+  state.selectedRecipeId = recipeId;
+  state.editingRecipeId = null;
+  state.desiredServings = null;
+  persistState();
+  renderRecipeLibrary();
+  renderRecipeDetail();
+}
+
+function handleStartEdit(recipeId) {
+  state.editingRecipeId = recipeId;
+  renderRecipeDetail();
+}
+
+function handleCancelEdit() {
+  state.editingRecipeId = null;
+  renderRecipeDetail();
+}
+
+async function handleSaveRecipeEdit(event, recipeId) {
+  event.preventDefault();
+  const statusEl = document.querySelector("#edit-status");
+  const updated = {
+    id: recipeId,
+    title: document.querySelector("#edit-title").value.trim(),
+    description: document.querySelector("#edit-description").value.trim(),
+    servings: document.querySelector("#edit-servings").value,
+    ingredients: splitLines(document.querySelector("#edit-ingredients").value),
+    instructions: splitLines(document.querySelector("#edit-instructions").value),
+    method: document.querySelector("#edit-method").value.trim(),
+  };
+
+  if (!updated.title) {
+    statusEl.textContent = "A title is required.";
+    return;
+  }
+
+  try {
+    if (IS_HOSTED_APP) {
+      const response = await hostedFetch(`/api/recipes/${encodeURIComponent(recipeId)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not save changes.");
+      }
+      state.recipes = Array.isArray(payload.recipes) ? payload.recipes : state.recipes;
+    } else {
+      const existing = state.recipes.find((entry) => entry.id === recipeId);
+      if (existing) {
+        Object.assign(existing, updated, { servings: normalizeServingsInput(updated.servings) });
+      }
+    }
+
+    state.editingRecipeId = null;
+    state.desiredServings = null;
+    persistState();
+    render();
+    setStatus(`Saved changes to "${updated.title}".`);
+  } catch (error) {
+    statusEl.textContent = error.message || "Could not save changes.";
+  }
+}
+
+async function handleDeleteRecipe(recipeId) {
+  const recipe = state.recipes.find((entry) => entry.id === recipeId);
+  if (!recipe) {
+    return;
+  }
+
+  if (!window.confirm(`Delete "${recipe.title}"? This cannot be undone.`)) {
+    return;
+  }
+
+  try {
+    if (IS_HOSTED_APP) {
+      const response = await hostedFetch(`/api/recipes/${encodeURIComponent(recipeId)}`, {
+        method: "DELETE",
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not delete this recipe.");
+      }
+      state.recipes = Array.isArray(payload.recipes) ? payload.recipes : state.recipes;
+      state.planner = payload.planner || state.planner;
+    } else {
+      state.recipes = state.recipes.filter((entry) => entry.id !== recipeId);
+      WEEK_DAYS.forEach((day) => {
+        if (state.planner[day] === recipeId) {
+          state.planner[day] = "";
+        }
+      });
+    }
+
+    if (state.selectedRecipeId === recipeId) {
+      state.selectedRecipeId = state.recipes[0]?.id || "";
+      state.desiredServings = null;
+    }
+    state.editingRecipeId = null;
+    persistState();
+    render();
+    setStatus(`Deleted "${recipe.title}".`);
+  } catch (error) {
+    setStatus(error.message || "Could not delete this recipe.");
+  }
+}
+
 function persistState() {
-  localStorage.setItem(STORAGE_KEYS.selectedRecipeId, state.selectedRecipeId);
   if (!IS_HOSTED_APP) {
+    localStorage.setItem(STORAGE_KEYS.selectedRecipeId, state.selectedRecipeId);
     localStorage.setItem(STORAGE_KEYS.recipes, JSON.stringify(state.recipes));
     localStorage.setItem(STORAGE_KEYS.planner, JSON.stringify(state.planner));
   }
@@ -790,7 +570,10 @@ function persistState() {
 
 async function hydrateRemoteState() {
   try {
-    const response = await fetch("/api/state");
+    const response = await hostedFetch("/api/state");
+    if (response.status === 401) {
+      return;
+    }
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
       throw new Error(payload.error || "Could not load the shared meal board.");
@@ -837,18 +620,6 @@ async function buildShareUrl() {
   const url = new URL(window.location.href);
   url.searchParams.set("share", encoded);
   return url.toString();
-}
-
-async function encodeSharedPayload(payload) {
-  const json = JSON.stringify(payload);
-  const compressed = await gzipText(json);
-  return bytesToBase64Url(compressed);
-}
-
-async function decodeSharedPayload(value) {
-  const bytes = base64UrlToBytes(value);
-  const json = await gunzipBytes(bytes);
-  return JSON.parse(json);
 }
 
 function render() {
@@ -917,12 +688,7 @@ function renderRecipeLibrary() {
     node.querySelector(".recipe-card-title").textContent = recipe.title;
     node.querySelector(".recipe-card-meta").textContent = `${recipe.ingredients.length} ingredients | ${recipe.instructions.length} steps`;
     node.classList.toggle("active", recipe.id === state.selectedRecipeId);
-    node.addEventListener("click", () => {
-      state.selectedRecipeId = recipe.id;
-      persistState();
-      renderRecipeLibrary();
-      renderRecipeDetail();
-    });
+    node.addEventListener("click", () => handleSelectRecipe(recipe.id));
     elements.recipeLibrary.appendChild(node);
   });
 }
@@ -938,22 +704,50 @@ function renderRecipeDetail() {
     return;
   }
 
+  if (state.editingRecipeId === recipe.id) {
+    renderRecipeEditForm(recipe);
+    return;
+  }
+
+  if (!state.desiredServings && recipe.servings) {
+    state.desiredServings = recipe.servings;
+  }
+
+  const factor = recipe.servings && state.desiredServings ? state.desiredServings / recipe.servings : 1;
+
   const ingredientsMarkup = recipe.ingredients
-    .map((ingredient) => `<li>${escapeHtml(ingredient)}</li>`)
+    .map((ingredient) => `<li>${escapeHtml(scaleIngredientText(ingredient, factor))}</li>`)
     .join("");
   const instructionsMarkup = recipe.instructions
     .map((instruction) => `<li>${escapeHtml(instruction)}</li>`)
     .join("");
-  const sourceLinkMarkup = recipe.sourceUrl && isSafeHttpUrl(recipe.sourceUrl)
-    ? `<a class="detail-link" href="${escapeAttribute(recipe.sourceUrl)}" target="_blank" rel="noreferrer">
-        View source recipe
-      </a>`
+  const sourceLinkMarkup =
+    recipe.sourceUrl && isSafeHttpUrl(recipe.sourceUrl)
+      ? `<a class="detail-link" href="${escapeAttribute(recipe.sourceUrl)}" target="_blank" rel="noreferrer">
+          View source recipe
+        </a>`
+      : "";
+  const servingsControlMarkup = recipe.servings
+    ? `<div class="servings-control">
+        <label>Scale ingredients to
+          <input type="number" id="servings-input" min="1" value="${state.desiredServings || recipe.servings}" />
+          servings
+        </label>
+        <span class="servings-base">Recipe as saved serves ${recipe.servings}.</span>
+      </div>`
     : "";
 
   elements.recipeDetail.innerHTML = `
     <div class="detail-header">
-      <h3>${escapeHtml(recipe.title)}</h3>
+      <div class="detail-header-row">
+        <h3>${escapeHtml(recipe.title)}</h3>
+        <div class="detail-actions">
+          <button id="edit-recipe-button" class="ghost-button" type="button">Edit</button>
+          <button id="delete-recipe-button" class="ghost-button danger-button" type="button">Delete</button>
+        </div>
+      </div>
       ${sourceLinkMarkup}
+      ${servingsControlMarkup}
       <p>${escapeHtml(recipe.description || "Saved from the source page and ready for weekly planning.")}</p>
     </div>
     <div class="detail-grid">
@@ -971,6 +765,61 @@ function renderRecipeDetail() {
       </section>
     </div>
   `;
+
+  elements.recipeDetail
+    .querySelector("#edit-recipe-button")
+    .addEventListener("click", () => handleStartEdit(recipe.id));
+  elements.recipeDetail
+    .querySelector("#delete-recipe-button")
+    .addEventListener("click", () => handleDeleteRecipe(recipe.id));
+
+  const servingsInput = elements.recipeDetail.querySelector("#servings-input");
+  servingsInput?.addEventListener("change", (event) => {
+    const value = Number(event.target.value);
+    state.desiredServings = Number.isFinite(value) && value > 0 ? value : recipe.servings;
+    renderRecipeDetail();
+  });
+}
+
+function renderRecipeEditForm(recipe) {
+  elements.recipeDetail.innerHTML = `
+    <form id="recipe-edit-form" class="import-form recipe-edit-form">
+      <label class="field">
+        <span>Title</span>
+        <input id="edit-title" type="text" value="${escapeAttribute(recipe.title)}" required />
+      </label>
+      <label class="field">
+        <span>Description</span>
+        <textarea id="edit-description" rows="2">${escapeHtml(recipe.description || "")}</textarea>
+      </label>
+      <label class="field">
+        <span>Servings</span>
+        <input id="edit-servings" type="number" min="1" value="${recipe.servings || ""}" />
+      </label>
+      <label class="field">
+        <span>Ingredients (one per line)</span>
+        <textarea id="edit-ingredients" rows="8">${escapeHtml(recipe.ingredients.join("\n"))}</textarea>
+      </label>
+      <label class="field">
+        <span>Instructions (one per line)</span>
+        <textarea id="edit-instructions" rows="8">${escapeHtml(recipe.instructions.join("\n"))}</textarea>
+      </label>
+      <label class="field">
+        <span>Method summary</span>
+        <textarea id="edit-method" rows="3">${escapeHtml(recipe.method || "")}</textarea>
+      </label>
+      <div class="import-actions">
+        <button class="primary-button" type="submit">Save changes</button>
+        <button id="cancel-edit-button" class="ghost-button" type="button">Cancel</button>
+        <p id="edit-status" class="status-text" aria-live="polite"></p>
+      </div>
+    </form>
+  `;
+
+  elements.recipeDetail
+    .querySelector("#recipe-edit-form")
+    .addEventListener("submit", (event) => handleSaveRecipeEdit(event, recipe.id));
+  elements.recipeDetail.querySelector("#cancel-edit-button").addEventListener("click", handleCancelEdit);
 }
 
 function renderShoppingList() {
@@ -1051,7 +900,7 @@ function buildShoppingItemCount() {
 
 async function savePlannerToBackend() {
   try {
-    await fetch("/api/planner", {
+    await hostedFetch("/api/planner", {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -1063,225 +912,16 @@ async function savePlannerToBackend() {
   }
 }
 
-function parseIngredient(ingredient) {
-  const cleaned = normalizeIngredientLabel(ingredient);
-  const quantityMatch = cleaned.match(/^(\d+(?:\.\d+)?(?:\/\d+)?)(?:\s+|-)?(.*)$/);
-  const quantity = quantityMatch ? parseIngredientQuantity(quantityMatch[1]) : null;
-  const remainder = quantityMatch ? quantityMatch[2].trim() : cleaned;
-  const tokens = remainder.split(/\s+/).filter(Boolean);
-  const firstToken = tokens[0] || "";
-  const unit = isIngredientUnit(firstToken) ? singularizeWord(firstToken) : "";
-  const nameTokens = unit ? tokens.slice(1) : tokens;
-  const ingredientName = canonicalizeIngredientName(
-    nameTokens.join(" ") || remainder || cleaned
-  );
-  const label = titleCaseIngredient(ingredientName);
-  const key = normalizeIngredientKey(ingredientName);
-
-  return {
-    original: ingredient,
-    label,
-    key,
-    quantity,
-    unit,
-  };
-}
-
-function createIngredientEntry(parsed, recipeTitle) {
-  return {
-    label: parsed.label,
-    recipes: [recipeTitle],
-    quantityTotal: parsed.quantity,
-    unit: parsed.unit,
-    rawCount: 1,
-    sourceLabels: [parsed.original],
-  };
-}
-
-function mergeIngredientEntry(entry, parsed, recipeTitle) {
-  if (!entry.recipes.includes(recipeTitle)) {
-    entry.recipes.push(recipeTitle);
-  }
-
-  entry.rawCount += 1;
-  entry.sourceLabels.push(parsed.original);
-
-  if (entry.unit === parsed.unit && entry.quantityTotal !== null && parsed.quantity !== null) {
-    entry.quantityTotal += parsed.quantity;
-    return;
-  }
-
-  if (!entry.unit && !parsed.unit && entry.quantityTotal !== null && parsed.quantity !== null) {
-    entry.quantityTotal += parsed.quantity;
-    return;
-  }
-
-  entry.quantityTotal = null;
-}
-
-function formatIngredientSummary(item) {
-  if (item.quantityTotal !== null) {
-    const quantity = formatQuantity(item.quantityTotal);
-    return item.unit ? `${quantity} ${item.unit}` : quantity;
-  }
-
-  return item.recipes.length > 1 ? `${item.recipes.length} recipes` : item.recipes[0];
-}
-
-function groupShoppingItems(items) {
-  const groups = SHOPPING_CATEGORIES.map((category) => ({
-    label: category.label,
-    items: [],
-  }));
-
-  items.forEach((item) => {
-    const categoryIndex = findShoppingCategoryIndex(item.label);
-    groups[categoryIndex].items.push(item);
-  });
-
-  return groups.filter((group) => group.items.length);
-}
-
-function findShoppingCategoryIndex(label) {
-  const normalized = normalizeIngredientLabel(label);
-  const matchedIndex = SHOPPING_CATEGORIES.findIndex(
-    (category) =>
-      category.matches.length &&
-      category.matches.some(
-        (match) =>
-          normalized.includes(match) ||
-          normalizeIngredientKey(label).includes(normalizeIngredientKey(match))
-      )
-  );
-
-  return matchedIndex >= 0 ? matchedIndex : SHOPPING_CATEGORIES.length - 1;
-}
-
-function normalizeIngredientLabel(value) {
+function splitLines(value) {
   return String(value || "")
-    .toLowerCase()
-    .replace(/^[\-\u2022*]+\s*/, "")
-    .replace(/\s*\([^)]*\)/g, "")
-    .replace(/,/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
 }
 
-function normalizeIngredientKey(value) {
-  return stripIngredientDescriptors(canonicalizeIngredientName(value))
-    .replace(/\s+/g, " ")
-    .trim()
-    .split(" ")
-    .map((word) => singularizeWord(word))
-    .join(" ");
-}
-
-function canonicalizeIngredientName(value) {
-  const normalized = stripIngredientDescriptors(normalizeIngredientLabel(value))
-    .replace(/\s+/g, " ")
-    .trim();
-
-  const synonymMatch = INGREDIENT_SYNONYMS.find((entry) =>
-    entry.matches.some((match) => normalizeIngredientLabel(match) === normalized)
-  );
-
-  return synonymMatch ? synonymMatch.canonical : normalized;
-}
-
-function stripIngredientDescriptors(value) {
-  return String(value || "")
-    .replace(/\b\d+\s*x\s*/g, " ")
-    .replace(/\bx\s+\d+/g, " ")
-    .replace(/\b\d+(?:\.\d+)?\s*(g|kg|ml|l)\b/g, " ")
-    .replace(/\b(heaped|level|pinch)\b/g, " ")
-    .replace(/\b(powdered|ground)\b/g, " ")
-    .replace(/\bcut into strips\b/g, " ")
-    .replace(/\bcut into pieces\b/g, " ")
-    .replace(/\bcut into chunks\b/g, " ")
-    .replace(
-      /\b(of|and|or|very|fresh|large|small|medium|extra|to taste|optional|sweet|smoked|crushed|chopped|finely|roughly|thinly|minced|diced|sliced|grated|deseeded|seeded|peeled|skinless|boneless|can|cans|tin|tins)\b/g,
-      " "
-    );
-}
-
-function parseIngredientQuantity(value) {
-  if (!value) {
-    return null;
-  }
-
-  if (value.includes("/")) {
-    const [numerator, denominator] = value.split("/");
-    const top = Number(numerator);
-    const bottom = Number(denominator);
-    return Number.isFinite(top) && Number.isFinite(bottom) && bottom !== 0 ? top / bottom : null;
-  }
-
-  const quantity = Number(value);
-  return Number.isFinite(quantity) ? quantity : null;
-}
-
-function formatQuantity(value) {
-  if (!Number.isFinite(value)) {
-    return "";
-  }
-
-  const rounded = Math.round(value * 100) / 100;
-  return Number.isInteger(rounded) ? String(rounded) : String(rounded);
-}
-
-function singularizeWord(word) {
-  if (!word) {
-    return "";
-  }
-
-  if (word.endsWith("ies")) {
-    return `${word.slice(0, -3)}y`;
-  }
-
-  if (word.endsWith("oes")) {
-    return word.slice(0, -2);
-  }
-
-  if (word.endsWith("s") && !word.endsWith("ss")) {
-    return word.slice(0, -1);
-  }
-
-  return word;
-}
-
-function titleCaseIngredient(value) {
-  return String(value || "")
-    .split(" ")
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
-
-function isIngredientUnit(word) {
-  return [
-    "g",
-    "kg",
-    "ml",
-    "l",
-    "tbsp",
-    "tsp",
-    "cup",
-    "cups",
-    "clove",
-    "cloves",
-    "can",
-    "cans",
-    "tin",
-    "tins",
-    "handful",
-    "handfuls",
-    "slice",
-    "slices",
-    "bunch",
-    "bunches",
-    "packet",
-    "packets",
-  ].includes(word);
+function normalizeServingsInput(value) {
+  const servings = Number.parseInt(value, 10);
+  return Number.isFinite(servings) && servings > 0 ? servings : null;
 }
 
 function readJson(key, fallback) {
@@ -1301,44 +941,16 @@ function setShareStatus(message) {
   elements.shareStatus.textContent = message;
 }
 
-async function gzipText(value) {
-  if (typeof CompressionStream === "undefined") {
-    return new TextEncoder().encode(value);
-  }
-
-  const stream = new Blob([value]).stream().pipeThrough(new CompressionStream("gzip"));
-  const buffer = await new Response(stream).arrayBuffer();
-  return new Uint8Array(buffer);
+function setAuthStatus(message) {
+  elements.authStatus.textContent = message;
 }
 
-async function gunzipBytes(bytes) {
-  if (typeof DecompressionStream === "undefined") {
-    return new TextDecoder().decode(bytes);
+function isSafeHttpUrl(value) {
+  try {
+    return ["http:", "https:"].includes(new URL(value, window.location.href).protocol);
+  } catch (error) {
+    return false;
   }
-
-  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
-  return await new Response(stream).text();
-}
-
-function bytesToBase64Url(bytes) {
-  let binary = "";
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte);
-  });
-
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-function base64UrlToBytes(value) {
-  const padded = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
-  const binary = atob(padded);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-
-  return bytes;
 }
 
 function escapeHtml(value) {
@@ -1352,12 +964,4 @@ function escapeHtml(value) {
 
 function escapeAttribute(value) {
   return escapeHtml(value);
-}
-
-function isSafeHttpUrl(value) {
-  try {
-    return ["http:", "https:"].includes(new URL(value, window.location.href).protocol);
-  } catch (error) {
-    return false;
-  }
 }
