@@ -944,13 +944,16 @@ function renderRecipeDetail() {
   const instructionsMarkup = recipe.instructions
     .map((instruction) => `<li>${escapeHtml(instruction)}</li>`)
     .join("");
+  const sourceLinkMarkup = recipe.sourceUrl && isSafeHttpUrl(recipe.sourceUrl)
+    ? `<a class="detail-link" href="${escapeAttribute(recipe.sourceUrl)}" target="_blank" rel="noreferrer">
+        View source recipe
+      </a>`
+    : "";
 
   elements.recipeDetail.innerHTML = `
     <div class="detail-header">
       <h3>${escapeHtml(recipe.title)}</h3>
-      <a class="detail-link" href="${escapeAttribute(recipe.sourceUrl)}" target="_blank" rel="noreferrer">
-        View source recipe
-      </a>
+      ${sourceLinkMarkup}
       <p>${escapeHtml(recipe.description || "Saved from the source page and ready for weekly planning.")}</p>
     </div>
     <div class="detail-grid">
@@ -1349,4 +1352,12 @@ function escapeHtml(value) {
 
 function escapeAttribute(value) {
   return escapeHtml(value);
+}
+
+function isSafeHttpUrl(value) {
+  try {
+    return ["http:", "https:"].includes(new URL(value, window.location.href).protocol);
+  } catch (error) {
+    return false;
+  }
 }
