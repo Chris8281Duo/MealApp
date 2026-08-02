@@ -271,6 +271,38 @@ const INGREDIENT_SYNONYMS = [
   },
 ];
 
+const DEAL_THRESHOLD = 0.15;
+
+const PI_BRAND_GATE_KEYWORDS = ["raspberry pi", "rpi"];
+
+const PI_REFERENCE_VALUES = [
+  { label: "Raspberry Pi 5 (8GB)", keywords: ["pi 5", "8gb"], value: 80 },
+  { label: "Raspberry Pi 5 (4GB)", keywords: ["pi 5", "4gb"], value: 60 },
+  { label: "Raspberry Pi 5 (2GB)", keywords: ["pi 5", "2gb"], value: 50 },
+  { label: "Raspberry Pi 4 Model B (8GB)", keywords: ["pi 4", "8gb"], value: 75 },
+  { label: "Raspberry Pi 4 Model B (4GB)", keywords: ["pi 4", "4gb"], value: 55 },
+  { label: "Raspberry Pi 4 Model B (2GB)", keywords: ["pi 4", "2gb"], value: 45 },
+  { label: "Raspberry Pi 4 Model B (1GB)", keywords: ["pi 4", "1gb"], value: 35 },
+  { label: "Raspberry Pi 400", keywords: ["pi 400"], value: 70 },
+  { label: "Raspberry Pi 3 Model B+", keywords: ["pi 3", "b+"], value: 35 },
+  { label: "Raspberry Pi 3 Model B", keywords: ["pi 3", "model b"], value: 30 },
+  { label: "Raspberry Pi Zero 2 W", keywords: ["zero 2 w"], value: 15 },
+  { label: "Raspberry Pi Zero W", keywords: ["zero w"], value: 10 },
+  { label: "Raspberry Pi Zero", keywords: ["pi zero"], value: 5 },
+  { label: "Raspberry Pi Pico W", keywords: ["pico w"], value: 6 },
+  { label: "Raspberry Pi Pico", keywords: ["pico"], value: 4 },
+  { label: "Raspberry Pi Camera Module 3", keywords: ["camera module 3"], value: 25 },
+  { label: "Raspberry Pi Camera Module", keywords: ["camera module"], value: 15 },
+  { label: "Raspberry Pi Sense HAT", keywords: ["sense hat"], value: 40 },
+  { label: "Raspberry Pi PoE+ HAT", keywords: ["poe+ hat", "poe hat"], value: 20 },
+  {
+    label: "Raspberry Pi Official 27W USB-C Power Supply",
+    keywords: ["27w", "power supply"],
+    value: 12,
+  },
+  { label: "Raspberry Pi Official Case", keywords: ["official case"], value: 10 },
+];
+
 const demoRecipes = [
   {
     id: crypto.randomUUID(),
@@ -343,6 +375,12 @@ const elements = {
   shoppingCount: document.querySelector("#shopping-count"),
   recipeCardTemplate: document.querySelector("#recipe-card-template"),
   shoppingItemTemplate: document.querySelector("#shopping-item-template"),
+  piDealsForm: document.querySelector("#pi-deals-form"),
+  piDealsUrl: document.querySelector("#pi-deals-url"),
+  piDealsHtml: document.querySelector("#pi-deals-html"),
+  piDealsStatus: document.querySelector("#pi-deals-status"),
+  piDealsResults: document.querySelector("#pi-deals-results"),
+  piDealCardTemplate: document.querySelector("#pi-deal-card-template"),
 };
 
 let state = {
@@ -384,6 +422,7 @@ function bindEvents() {
   elements.importForm.addEventListener("submit", handleImportSubmit);
   elements.loadDemoButton.addEventListener("click", handleLoadDemoRecipes);
   elements.shareBoardButton.addEventListener("click", handleShareBoard);
+  elements.piDealsForm.addEventListener("submit", handlePiDealsSubmit);
 }
 
 async function handleImportSubmit(event) {
@@ -477,6 +516,278 @@ async function handleShareBoard() {
   } catch (error) {
     setShareStatus("Could not create a share link from this recipe board.");
   }
+}
+
+async function handlePiDealsSubmit(event) {
+  event.preventDefault();
+  const url = elements.piDealsUrl.value.trim();
+  const htmlFallback = elements.piDealsHtml.value.trim();
+
+  if (!url && !htmlFallback) {
+    setPiDealsStatus("Add a listings page URL or paste its HTML first.");
+    return;
+  }
+
+  setPiDealsStatus("Scanning for deals...");
+
+  try {
+    const result = htmlFallback
+      ? await scanPiDeals({ html: htmlFallback, sourceUrl: url })
+      : await scanPiDeals({ url });
+
+    renderPiDeals(result.deals);
+    setPiDealsStatus(
+      result.deals.length
+        ? `Found ${result.deals.length} deal${result.deals.length === 1 ? "" : "s"} below typical value (scanned ${result.scanned} listing${result.scanned === 1 ? "" : "s"}).`
+        : `No deals below typical value were found (scanned ${result.scanned} listing${result.scanned === 1 ? "" : "s"}).`
+    );
+  } catch (error) {
+    setPiDealsStatus(error.message || "Could not scan that page for deals.");
+  }
+}
+
+async function scanPiDeals({ url = "", html = "", sourceUrl = "" }) {
+  if (IS_HOSTED_APP) {
+    return await scanPiDealsViaEndpoint({ url, html, sourceUrl });
+  }
+
+  const pageHtml = html || (await fetchListingMarkup(url));
+  const listings = parseListingsHtml(pageHtml, sourceUrl || url);
+  return evaluatePiDeals(listings);
+}
+
+async function scanPiDealsViaEndpoint({ url, html, sourceUrl }) {
+  const response = await fetch("/api/pi-deals", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ url, html, sourceUrl }),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(
+      payload.error ||
+        "The hosted deal finder could not fetch that page. Try pasting the page HTML instead."
+    );
+  }
+
+  return payload;
+}
+
+async function fetchListingMarkup(url) {
+  if (!url) {
+    throw new Error("Add a listings page URL first.");
+  }
+
+  const directResponse = await fetch(url);
+  if (directResponse.ok) {
+    return await directResponse.text();
+  }
+
+  throw new Error(
+    "Could not fetch that URL directly. Paste the page HTML into the fallback field and scan again."
+  );
+}
+
+function parseListingsHtml(html, sourceUrl) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+  const ebayListings = extractEbayStyleListings(doc, sourceUrl);
+  return ebayListings.length ? ebayListings : extractGenericListings(doc, sourceUrl);
+}
+
+function extractEbayStyleListings(doc, sourceUrl) {
+  const listings = [];
+
+  doc.querySelectorAll("li.s-item, div.s-item").forEach((item) => {
+    const titleEl = item.querySelector(".s-item__title");
+    const priceEl = item.querySelector(".s-item__price");
+    const linkEl = item.querySelector("a.s-item__link") || item.querySelector("a");
+    const imageEl = item.querySelector(".s-item__image-img") || item.querySelector("img");
+
+    const title = normalizeText(titleEl?.textContent);
+    if (!title || title.toLowerCase() === "shop on ebay") {
+      return;
+    }
+
+    const price = parsePrice(priceEl?.textContent || "");
+    if (!price) {
+      return;
+    }
+
+    listings.push({
+      title,
+      price: price.amount,
+      currency: price.currency,
+      link: resolveUrl(linkEl?.getAttribute("href"), sourceUrl),
+      image: resolveUrl(imageEl?.getAttribute("src"), sourceUrl),
+    });
+  });
+
+  return listings;
+}
+
+function extractGenericListings(doc, sourceUrl) {
+  const listings = [];
+  const seenLinks = new Set();
+
+  doc.querySelectorAll("a[href]").forEach((anchor) => {
+    const anchorText = normalizeText(anchor.textContent);
+    const container = anchor.closest("li, div, article") || anchor.parentElement;
+    const contextText = normalizeText(container?.textContent || anchorText);
+
+    const price = parsePrice(contextText);
+    if (!price) {
+      return;
+    }
+
+    const title = anchorText.length > 8 ? anchorText : contextText.slice(0, 120);
+    if (!title) {
+      return;
+    }
+
+    const link = resolveUrl(anchor.getAttribute("href"), sourceUrl);
+    if (!link || seenLinks.has(link)) {
+      return;
+    }
+    seenLinks.add(link);
+
+    const imageEl = container?.querySelector("img") || anchor.querySelector("img");
+
+    listings.push({
+      title,
+      price: price.amount,
+      currency: price.currency,
+      link,
+      image: resolveUrl(imageEl?.getAttribute("src"), sourceUrl),
+    });
+  });
+
+  return listings;
+}
+
+function evaluatePiDeals(listings) {
+  const deals = listings
+    .map((listing) => {
+      const titleLower = listing.title.toLowerCase();
+      if (!PI_BRAND_GATE_KEYWORDS.some((keyword) => titleLower.includes(keyword))) {
+        return null;
+      }
+
+      const match = matchPiReferenceValue(titleLower);
+      if (!match) {
+        return null;
+      }
+
+      if (listing.price <= 0 || listing.price >= match.value) {
+        return null;
+      }
+
+      const discount = (match.value - listing.price) / match.value;
+      if (discount < DEAL_THRESHOLD) {
+        return null;
+      }
+
+      return {
+        title: listing.title,
+        match: match.label,
+        price: listing.price,
+        currency: listing.currency,
+        estimatedValue: match.value,
+        discountPercent: Math.round(discount * 1000) / 10,
+        link: listing.link,
+        image: listing.image,
+        comparable: listing.currency === "$",
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => right.discountPercent - left.discountPercent);
+
+  return { deals, scanned: listings.length };
+}
+
+function matchPiReferenceValue(titleLower) {
+  let bestMatch = null;
+  let bestScore = 0;
+
+  PI_REFERENCE_VALUES.forEach((entry) => {
+    if (entry.keywords.every((keyword) => titleLower.includes(keyword))) {
+      if (entry.keywords.length > bestScore) {
+        bestScore = entry.keywords.length;
+        bestMatch = entry;
+      }
+    }
+  });
+
+  return bestMatch;
+}
+
+function parsePrice(text) {
+  if (!text) {
+    return null;
+  }
+
+  const match = text.match(/([$£€])\s?(\d{1,3}(?:[,.]\d{3})*(?:\.\d{1,2})?)/);
+  if (!match) {
+    return null;
+  }
+
+  const amount = Number(match[2].replace(/,/g, ""));
+  return Number.isFinite(amount) ? { currency: match[1], amount } : null;
+}
+
+function resolveUrl(value, sourceUrl) {
+  if (!value) {
+    return "";
+  }
+
+  try {
+    return new URL(value, sourceUrl || window.location.href).toString();
+  } catch (error) {
+    return "";
+  }
+}
+
+function renderPiDeals(deals) {
+  elements.piDealsResults.innerHTML = "";
+
+  if (!deals.length) {
+    elements.piDealsResults.className = "pi-deals-results empty-state";
+    elements.piDealsResults.textContent =
+      "No deals below typical value were found. Try a different search or listings page.";
+    return;
+  }
+
+  elements.piDealsResults.className = "pi-deals-results";
+
+  deals.forEach((deal) => {
+    const node = elements.piDealCardTemplate.content.firstElementChild.cloneNode(true);
+    const imageEl = node.querySelector(".pi-deal-image");
+    if (deal.image) {
+      imageEl.src = deal.image;
+    } else {
+      imageEl.remove();
+    }
+
+    node.querySelector(".pi-deal-title").textContent = deal.title;
+    node.querySelector(".pi-deal-match").textContent = `Matched: ${deal.match}${
+      deal.comparable ? "" : " (different currency, compare manually)"
+    }`;
+    node.querySelector(".pi-deal-price").textContent = `Listed: ${deal.currency}${deal.price.toFixed(2)}`;
+    node.querySelector(".pi-deal-value").textContent = `Typical value: $${deal.estimatedValue.toFixed(2)}`;
+    node.querySelector(".pi-deal-savings").textContent = `${deal.discountPercent}% under value`;
+
+    const link = node.querySelector(".pi-deal-link");
+    link.href = deal.link || "#";
+
+    elements.piDealsResults.appendChild(node);
+  });
+}
+
+function setPiDealsStatus(message) {
+  elements.piDealsStatus.textContent = message;
 }
 
 async function importRecipeFromUrl(url) {

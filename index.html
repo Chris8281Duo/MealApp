@@ -137,6 +137,51 @@
             and method here.
           </article>
         </section>
+
+        <section class="panel pi-deals-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="kicker">Bonus tool</p>
+              <h2>Raspberry Pi deal finder</h2>
+            </div>
+          </div>
+          <p class="panel-intro">
+            Paste a marketplace listings page URL (or its HTML if the site blocks direct
+            fetching) and this scans it for Raspberry Pi boards, kits, and accessories
+            priced below their typical market value.
+          </p>
+
+          <form id="pi-deals-form" class="import-form">
+            <label class="field">
+              <span>Listings page URL</span>
+              <input
+                id="pi-deals-url"
+                name="piDealsUrl"
+                type="url"
+                placeholder="https://www.ebay.com/sch/i.html?_nkw=raspberry+pi"
+              />
+            </label>
+
+            <label class="field">
+              <span>Optional page HTML fallback</span>
+              <textarea
+                id="pi-deals-html"
+                name="piDealsHtml"
+                rows="6"
+                placeholder="Paste the listings page HTML here if the source site blocks direct fetching."
+              ></textarea>
+            </label>
+
+            <div class="import-actions">
+              <button class="primary-button" type="submit">Scan for deals</button>
+              <p id="pi-deals-status" class="status-text" aria-live="polite"></p>
+            </div>
+          </form>
+
+          <div id="pi-deals-results" class="pi-deals-results empty-state">
+            Scan a listings page to see boards and kits priced below their typical market value.
+          </div>
+        </section>
       </main>
     </div>
 
@@ -152,6 +197,22 @@
         <span class="shopping-item-name"></span>
         <span class="shopping-item-count"></span>
       </li>
+    </template>
+
+    <template id="pi-deal-card-template">
+      <article class="pi-deal-card">
+        <img class="pi-deal-image" alt="" />
+        <div class="pi-deal-body">
+          <h3 class="pi-deal-title"></h3>
+          <p class="pi-deal-match"></p>
+          <div class="pi-deal-prices">
+            <span class="pi-deal-price"></span>
+            <span class="pi-deal-value"></span>
+            <span class="pi-deal-savings"></span>
+          </div>
+          <a class="pi-deal-link" target="_blank" rel="noreferrer">View listing</a>
+        </div>
+      </article>
     </template>
 
     <script src="./app.js"></script>

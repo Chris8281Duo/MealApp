@@ -263,6 +263,16 @@ body::before {
   grid-column: span 8;
 }
 
+.pi-deals-panel {
+  grid-column: span 12;
+}
+
+.panel-intro {
+  margin: -0.4rem 0 1.1rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
 .panel-heading {
   display: flex;
   justify-content: space-between;
@@ -525,6 +535,72 @@ select:focus {
 .shopping-item-count {
   color: var(--highlight);
   font-size: 0.92rem;
+}
+
+.pi-deals-results {
+  margin-top: 1.1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 1rem;
+}
+
+.pi-deals-results.empty-state {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: var(--muted);
+  border: 1px dashed rgba(112, 67, 25, 0.24);
+  border-radius: 20px;
+  padding: 1.6rem 1.2rem;
+  background: rgba(255, 251, 246, 0.5);
+}
+
+.pi-deal-card {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1rem;
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 250, 245, 0.95), rgba(246, 235, 220, 0.92));
+  border: 1px solid rgba(112, 67, 25, 0.12);
+  box-shadow: 0 10px 24px rgba(88, 54, 25, 0.08);
+}
+
+.pi-deal-image {
+  width: 100%;
+  height: 140px;
+  object-fit: contain;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.pi-deal-title {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.pi-deal-match {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.pi-deal-prices {
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.92rem;
+}
+
+.pi-deal-savings {
+  font-weight: 700;
+  color: var(--highlight);
+}
+
+.pi-deal-link {
+  color: var(--primary-deep);
+  text-decoration-thickness: 0.08em;
+  justify-self: start;
 }
 
 @media (max-width: 1024px) {
