@@ -14,36 +14,54 @@ PRICE_PATTERN = re.compile(r"([$£€])\s?(\d{1,3}(?:[,.]\d{3})*(?:\.\d{1,2})?)"
 # Typical resale/market value for common Raspberry Pi boards, kits, and
 # accessories in USD. Every keyword in an entry must appear in a listing's
 # title for that entry to match; the entry with the most matched keywords
-# (i.e. the most specific one) wins.
+# (i.e. the most specific one) wins. Board keywords spell out "raspberry pi"
+# in full (rather than a bare "pi 4") so a clone board that merely mentions
+# Raspberry Pi for compatibility (e.g. "Orange Pi 4", "for Raspberry Pi")
+# can't satisfy them by coincidence.
 REFERENCE_VALUES = [
-    {"label": "Raspberry Pi 5 (8GB)", "keywords": ["pi 5", "8gb"], "value": 80},
-    {"label": "Raspberry Pi 5 (4GB)", "keywords": ["pi 5", "4gb"], "value": 60},
-    {"label": "Raspberry Pi 5 (2GB)", "keywords": ["pi 5", "2gb"], "value": 50},
-    {"label": "Raspberry Pi 4 Model B (8GB)", "keywords": ["pi 4", "8gb"], "value": 75},
-    {"label": "Raspberry Pi 4 Model B (4GB)", "keywords": ["pi 4", "4gb"], "value": 55},
-    {"label": "Raspberry Pi 4 Model B (2GB)", "keywords": ["pi 4", "2gb"], "value": 45},
-    {"label": "Raspberry Pi 4 Model B (1GB)", "keywords": ["pi 4", "1gb"], "value": 35},
-    {"label": "Raspberry Pi 400", "keywords": ["pi 400"], "value": 70},
-    {"label": "Raspberry Pi 3 Model B+", "keywords": ["pi 3", "b+"], "value": 35},
-    {"label": "Raspberry Pi 3 Model B", "keywords": ["pi 3", "model b"], "value": 30},
-    {"label": "Raspberry Pi Zero 2 W", "keywords": ["zero 2 w"], "value": 15},
-    {"label": "Raspberry Pi Zero W", "keywords": ["zero w"], "value": 10},
-    {"label": "Raspberry Pi Zero", "keywords": ["pi zero"], "value": 5},
-    {"label": "Raspberry Pi Pico W", "keywords": ["pico w"], "value": 6},
-    {"label": "Raspberry Pi Pico", "keywords": ["pico"], "value": 4},
-    {"label": "Raspberry Pi Camera Module 3", "keywords": ["camera module 3"], "value": 25},
-    {"label": "Raspberry Pi Camera Module", "keywords": ["camera module"], "value": 15},
-    {"label": "Raspberry Pi Sense HAT", "keywords": ["sense hat"], "value": 40},
-    {"label": "Raspberry Pi PoE+ HAT", "keywords": ["poe+ hat", "poe hat"], "value": 20},
+    {"label": "Raspberry Pi 5 (8GB)", "keywords": ["raspberry pi 5", "8gb"], "value": 80, "kind": "board"},
+    {"label": "Raspberry Pi 5 (4GB)", "keywords": ["raspberry pi 5", "4gb"], "value": 60, "kind": "board"},
+    {"label": "Raspberry Pi 5 (2GB)", "keywords": ["raspberry pi 5", "2gb"], "value": 50, "kind": "board"},
+    {"label": "Raspberry Pi 4 Model B (8GB)", "keywords": ["raspberry pi 4", "8gb"], "value": 75, "kind": "board"},
+    {"label": "Raspberry Pi 4 Model B (4GB)", "keywords": ["raspberry pi 4", "4gb"], "value": 55, "kind": "board"},
+    {"label": "Raspberry Pi 4 Model B (2GB)", "keywords": ["raspberry pi 4", "2gb"], "value": 45, "kind": "board"},
+    {"label": "Raspberry Pi 4 Model B (1GB)", "keywords": ["raspberry pi 4", "1gb"], "value": 35, "kind": "board"},
+    {"label": "Raspberry Pi 400", "keywords": ["raspberry pi 400"], "value": 70, "kind": "board"},
+    {"label": "Raspberry Pi 3 Model B+", "keywords": ["raspberry pi 3", "b+"], "value": 35, "kind": "board"},
+    {"label": "Raspberry Pi 3 Model B", "keywords": ["raspberry pi 3", "model b"], "value": 30, "kind": "board"},
+    {"label": "Raspberry Pi Zero 2 W", "keywords": ["raspberry pi zero 2 w"], "value": 15, "kind": "board"},
+    {"label": "Raspberry Pi Zero W", "keywords": ["raspberry pi zero w"], "value": 10, "kind": "board"},
+    {"label": "Raspberry Pi Zero", "keywords": ["raspberry pi zero"], "value": 5, "kind": "board"},
+    {"label": "Raspberry Pi Pico W", "keywords": ["pico w"], "value": 6, "kind": "board"},
+    {"label": "Raspberry Pi Pico", "keywords": ["pico"], "value": 4, "kind": "board"},
+    {"label": "Raspberry Pi Camera Module 3", "keywords": ["camera module 3"], "value": 25, "kind": "accessory"},
+    {"label": "Raspberry Pi Camera Module", "keywords": ["camera module"], "value": 15, "kind": "accessory"},
+    {"label": "Raspberry Pi Sense HAT", "keywords": ["sense hat"], "value": 40, "kind": "accessory"},
+    {"label": "Raspberry Pi PoE+ HAT", "keywords": ["poe+ hat", "poe hat"], "value": 20, "kind": "accessory"},
     {
         "label": "Raspberry Pi Official 27W USB-C Power Supply",
         "keywords": ["27w", "power supply"],
         "value": 12,
+        "kind": "accessory",
     },
-    {"label": "Raspberry Pi Official Case", "keywords": ["official case"], "value": 10},
+    {"label": "Raspberry Pi Official Case", "keywords": ["official case"], "value": 10, "kind": "accessory"},
 ]
 
 BRAND_GATE_KEYWORDS = ["raspberry pi", "rpi"]
+
+# Accessory listings often mention a board only for compatibility ("Case for
+# Raspberry Pi 4", "Supports Raspberry Pi 3B+/4B"). Without this, that
+# mention alone can satisfy a board's keywords and get mispriced as the
+# board itself.
+ACCESSORY_PHRASE_PATTERN = re.compile(
+    r"\b(?:for|supports?|compatible(?:\s+with)?|works\s+with|fits)\s+(?:the\s+)?(?:raspberry\s+pi|rpi)\b",
+    re.IGNORECASE,
+)
+
+# Approximate, static conversion rates to USD. Good enough to catch a deal
+# without chasing live FX rates; listings in unlisted currencies are skipped
+# rather than compared incorrectly.
+EXCHANGE_RATES_TO_USD = {"$": 1.0, "£": 1.27, "€": 1.08}
 
 
 def find_deals_from_url(url: str, threshold: float = DEFAULT_DEAL_THRESHOLD) -> dict:
@@ -89,13 +107,13 @@ def parse_listings_html(html: str, source_url: str) -> list[dict]:
 def extract_ebay_style_listings(soup: BeautifulSoup, source_url: str) -> list[dict]:
     listings = []
 
-    for item in soup.select("li.s-item, div.s-item"):
-        title_el = item.select_one(".s-item__title")
-        price_el = item.select_one(".s-item__price")
-        link_el = item.select_one("a.s-item__link") or item.find("a")
-        image_el = item.select_one(".s-item__image-img") or item.find("img")
+    for item in soup.select("li.s-item, div.s-item, li.s-card, div.s-card"):
+        title_el = item.select_one(".s-item__title, .s-card__title")
+        price_el = item.select_one(".s-item__price, .s-card__price")
+        link_el = item.select_one("a.s-item__link, a.s-card__link") or item.find("a")
+        image_el = item.select_one(".s-item__image-img, .s-card__image") or item.find("img")
 
-        title = normalize_text(title_el.get_text(" ", strip=True) if title_el else "")
+        title = extract_listing_title(title_el)
         if not title or title.lower() == "shop on ebay":
             continue
 
@@ -114,10 +132,29 @@ def extract_ebay_style_listings(soup: BeautifulSoup, source_url: str) -> list[di
                 "currency": price["currency"],
                 "link": link,
                 "image": image,
+                "isAuction": is_auction_listing(item),
             }
         )
 
     return listings
+
+
+def is_auction_listing(item) -> bool:
+    # A live auction's current price is just the highest bid so far, not a
+    # price you can actually pay today, so it can't be judged as a "deal".
+    return bool(re.search(r"\d+\s+bids?\b", item.get_text(" ", strip=True), re.IGNORECASE))
+
+
+def extract_listing_title(title_el) -> str:
+    if not title_el:
+        return ""
+
+    clipped = title_el.select_one(".clipped")
+    if clipped:
+        clipped.extract()
+
+    title = normalize_text(title_el.get_text(" ", strip=True))
+    return re.sub(r"^New [Ll]isting\s+", "", title).strip()
 
 
 def extract_generic_listings(soup: BeautifulSoup, source_url: str) -> list[dict]:
@@ -152,6 +189,7 @@ def extract_generic_listings(soup: BeautifulSoup, source_url: str) -> list[dict]
                 "currency": price["currency"],
                 "link": link,
                 "image": image,
+                "isAuction": is_auction_listing(container) if container else False,
             }
         )
 
@@ -162,6 +200,9 @@ def evaluate_deals(listings: list[dict], threshold: float = DEFAULT_DEAL_THRESHO
     deals = []
 
     for listing in listings:
+        if listing.get("isAuction"):
+            continue
+
         title_lower = listing["title"].lower()
         if not any(keyword in title_lower for keyword in BRAND_GATE_KEYWORDS):
             continue
@@ -170,12 +211,20 @@ def evaluate_deals(listings: list[dict], threshold: float = DEFAULT_DEAL_THRESHO
         if not match:
             continue
 
-        price = listing["price"]
-        value = match["value"]
-        if price <= 0 or price >= value:
+        if match["kind"] == "board" and ACCESSORY_PHRASE_PATTERN.search(title_lower):
             continue
 
-        discount = (value - price) / value
+        rate = EXCHANGE_RATES_TO_USD.get(listing["currency"])
+        if rate is None:
+            continue
+
+        price = listing["price"]
+        value = match["value"]
+        price_usd = price * rate
+        if price_usd <= 0 or price_usd >= value:
+            continue
+
+        discount = (value - price_usd) / value
         if discount < threshold:
             continue
 
@@ -185,11 +234,12 @@ def evaluate_deals(listings: list[dict], threshold: float = DEFAULT_DEAL_THRESHO
                 "match": match["label"],
                 "price": price,
                 "currency": listing["currency"],
-                "estimatedValue": value,
+                "priceUsd": round(price_usd, 2),
+                "estimatedValueUsd": value,
                 "discountPercent": round(discount * 100, 1),
                 "link": listing["link"],
                 "image": listing["image"],
-                "comparable": listing["currency"] == "$",
+                "approxConversion": listing["currency"] != "$",
             }
         )
 

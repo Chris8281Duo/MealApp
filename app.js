@@ -275,33 +275,47 @@ const DEAL_THRESHOLD = 0.15;
 
 const PI_BRAND_GATE_KEYWORDS = ["raspberry pi", "rpi"];
 
+const EXCHANGE_RATES_TO_USD = { $: 1.0, "£": 1.27, "€": 1.08 };
+
+// Board keywords spell out "raspberry pi" in full (rather than a bare
+// "pi 4") so a clone board that merely mentions Raspberry Pi for
+// compatibility (e.g. "Orange Pi 4", "for Raspberry Pi") can't satisfy
+// them by coincidence.
 const PI_REFERENCE_VALUES = [
-  { label: "Raspberry Pi 5 (8GB)", keywords: ["pi 5", "8gb"], value: 80 },
-  { label: "Raspberry Pi 5 (4GB)", keywords: ["pi 5", "4gb"], value: 60 },
-  { label: "Raspberry Pi 5 (2GB)", keywords: ["pi 5", "2gb"], value: 50 },
-  { label: "Raspberry Pi 4 Model B (8GB)", keywords: ["pi 4", "8gb"], value: 75 },
-  { label: "Raspberry Pi 4 Model B (4GB)", keywords: ["pi 4", "4gb"], value: 55 },
-  { label: "Raspberry Pi 4 Model B (2GB)", keywords: ["pi 4", "2gb"], value: 45 },
-  { label: "Raspberry Pi 4 Model B (1GB)", keywords: ["pi 4", "1gb"], value: 35 },
-  { label: "Raspberry Pi 400", keywords: ["pi 400"], value: 70 },
-  { label: "Raspberry Pi 3 Model B+", keywords: ["pi 3", "b+"], value: 35 },
-  { label: "Raspberry Pi 3 Model B", keywords: ["pi 3", "model b"], value: 30 },
-  { label: "Raspberry Pi Zero 2 W", keywords: ["zero 2 w"], value: 15 },
-  { label: "Raspberry Pi Zero W", keywords: ["zero w"], value: 10 },
-  { label: "Raspberry Pi Zero", keywords: ["pi zero"], value: 5 },
-  { label: "Raspberry Pi Pico W", keywords: ["pico w"], value: 6 },
-  { label: "Raspberry Pi Pico", keywords: ["pico"], value: 4 },
-  { label: "Raspberry Pi Camera Module 3", keywords: ["camera module 3"], value: 25 },
-  { label: "Raspberry Pi Camera Module", keywords: ["camera module"], value: 15 },
-  { label: "Raspberry Pi Sense HAT", keywords: ["sense hat"], value: 40 },
-  { label: "Raspberry Pi PoE+ HAT", keywords: ["poe+ hat", "poe hat"], value: 20 },
+  { label: "Raspberry Pi 5 (8GB)", keywords: ["raspberry pi 5", "8gb"], value: 80, kind: "board" },
+  { label: "Raspberry Pi 5 (4GB)", keywords: ["raspberry pi 5", "4gb"], value: 60, kind: "board" },
+  { label: "Raspberry Pi 5 (2GB)", keywords: ["raspberry pi 5", "2gb"], value: 50, kind: "board" },
+  { label: "Raspberry Pi 4 Model B (8GB)", keywords: ["raspberry pi 4", "8gb"], value: 75, kind: "board" },
+  { label: "Raspberry Pi 4 Model B (4GB)", keywords: ["raspberry pi 4", "4gb"], value: 55, kind: "board" },
+  { label: "Raspberry Pi 4 Model B (2GB)", keywords: ["raspberry pi 4", "2gb"], value: 45, kind: "board" },
+  { label: "Raspberry Pi 4 Model B (1GB)", keywords: ["raspberry pi 4", "1gb"], value: 35, kind: "board" },
+  { label: "Raspberry Pi 400", keywords: ["raspberry pi 400"], value: 70, kind: "board" },
+  { label: "Raspberry Pi 3 Model B+", keywords: ["raspberry pi 3", "b+"], value: 35, kind: "board" },
+  { label: "Raspberry Pi 3 Model B", keywords: ["raspberry pi 3", "model b"], value: 30, kind: "board" },
+  { label: "Raspberry Pi Zero 2 W", keywords: ["raspberry pi zero 2 w"], value: 15, kind: "board" },
+  { label: "Raspberry Pi Zero W", keywords: ["raspberry pi zero w"], value: 10, kind: "board" },
+  { label: "Raspberry Pi Zero", keywords: ["raspberry pi zero"], value: 5, kind: "board" },
+  { label: "Raspberry Pi Pico W", keywords: ["pico w"], value: 6, kind: "board" },
+  { label: "Raspberry Pi Pico", keywords: ["pico"], value: 4, kind: "board" },
+  { label: "Raspberry Pi Camera Module 3", keywords: ["camera module 3"], value: 25, kind: "accessory" },
+  { label: "Raspberry Pi Camera Module", keywords: ["camera module"], value: 15, kind: "accessory" },
+  { label: "Raspberry Pi Sense HAT", keywords: ["sense hat"], value: 40, kind: "accessory" },
+  { label: "Raspberry Pi PoE+ HAT", keywords: ["poe+ hat", "poe hat"], value: 20, kind: "accessory" },
   {
     label: "Raspberry Pi Official 27W USB-C Power Supply",
     keywords: ["27w", "power supply"],
     value: 12,
+    kind: "accessory",
   },
-  { label: "Raspberry Pi Official Case", keywords: ["official case"], value: 10 },
+  { label: "Raspberry Pi Official Case", keywords: ["official case"], value: 10, kind: "accessory" },
 ];
+
+// Accessory listings often mention a board only for compatibility ("Case for
+// Raspberry Pi 4", "Supports Raspberry Pi 3B+/4B"). Without this, that
+// mention alone can satisfy a board's keywords and get mispriced as the
+// board itself.
+const ACCESSORY_PHRASE_PATTERN =
+  /\b(?:for|supports?|compatible(?:\s+with)?|works\s+with|fits)\s+(?:the\s+)?(?:raspberry\s+pi|rpi)\b/i;
 
 const demoRecipes = [
   {
@@ -601,13 +615,13 @@ function parseListingsHtml(html, sourceUrl) {
 function extractEbayStyleListings(doc, sourceUrl) {
   const listings = [];
 
-  doc.querySelectorAll("li.s-item, div.s-item").forEach((item) => {
-    const titleEl = item.querySelector(".s-item__title");
-    const priceEl = item.querySelector(".s-item__price");
-    const linkEl = item.querySelector("a.s-item__link") || item.querySelector("a");
-    const imageEl = item.querySelector(".s-item__image-img") || item.querySelector("img");
+  doc.querySelectorAll("li.s-item, div.s-item, li.s-card, div.s-card").forEach((item) => {
+    const titleEl = item.querySelector(".s-item__title, .s-card__title");
+    const priceEl = item.querySelector(".s-item__price, .s-card__price");
+    const linkEl = item.querySelector("a.s-item__link, a.s-card__link") || item.querySelector("a");
+    const imageEl = item.querySelector(".s-item__image-img, .s-card__image") || item.querySelector("img");
 
-    const title = normalizeText(titleEl?.textContent);
+    const title = extractListingTitle(titleEl);
     if (!title || title.toLowerCase() === "shop on ebay") {
       return;
     }
@@ -623,10 +637,28 @@ function extractEbayStyleListings(doc, sourceUrl) {
       currency: price.currency,
       link: resolveUrl(linkEl?.getAttribute("href"), sourceUrl),
       image: resolveUrl(imageEl?.getAttribute("src"), sourceUrl),
+      isAuction: isAuctionListing(item),
     });
   });
 
   return listings;
+}
+
+function extractListingTitle(titleEl) {
+  if (!titleEl) {
+    return "";
+  }
+
+  const clone = titleEl.cloneNode(true);
+  clone.querySelectorAll(".clipped").forEach((node) => node.remove());
+  const title = normalizeText(clone.textContent);
+  return title.replace(/^New [Ll]isting\s+/, "").trim();
+}
+
+function isAuctionListing(item) {
+  // A live auction's current price is just the highest bid so far, not a
+  // price you can actually pay today, so it can't be judged as a "deal".
+  return /\d+\s+bids?\b/i.test(normalizeText(item.textContent));
 }
 
 function extractGenericListings(doc, sourceUrl) {
@@ -662,6 +694,7 @@ function extractGenericListings(doc, sourceUrl) {
       currency: price.currency,
       link,
       image: resolveUrl(imageEl?.getAttribute("src"), sourceUrl),
+      isAuction: container ? isAuctionListing(container) : false,
     });
   });
 
@@ -671,6 +704,10 @@ function extractGenericListings(doc, sourceUrl) {
 function evaluatePiDeals(listings) {
   const deals = listings
     .map((listing) => {
+      if (listing.isAuction) {
+        return null;
+      }
+
       const titleLower = listing.title.toLowerCase();
       if (!PI_BRAND_GATE_KEYWORDS.some((keyword) => titleLower.includes(keyword))) {
         return null;
@@ -681,11 +718,21 @@ function evaluatePiDeals(listings) {
         return null;
       }
 
-      if (listing.price <= 0 || listing.price >= match.value) {
+      if (match.kind === "board" && ACCESSORY_PHRASE_PATTERN.test(titleLower)) {
         return null;
       }
 
-      const discount = (match.value - listing.price) / match.value;
+      const rate = EXCHANGE_RATES_TO_USD[listing.currency];
+      if (!rate) {
+        return null;
+      }
+
+      const priceUsd = listing.price * rate;
+      if (priceUsd <= 0 || priceUsd >= match.value) {
+        return null;
+      }
+
+      const discount = (match.value - priceUsd) / match.value;
       if (discount < DEAL_THRESHOLD) {
         return null;
       }
@@ -695,11 +742,12 @@ function evaluatePiDeals(listings) {
         match: match.label,
         price: listing.price,
         currency: listing.currency,
-        estimatedValue: match.value,
+        priceUsd: Math.round(priceUsd * 100) / 100,
+        estimatedValueUsd: match.value,
         discountPercent: Math.round(discount * 1000) / 10,
         link: listing.link,
         image: listing.image,
-        comparable: listing.currency === "$",
+        approxConversion: listing.currency !== "$",
       };
     })
     .filter(Boolean)
@@ -773,10 +821,12 @@ function renderPiDeals(deals) {
 
     node.querySelector(".pi-deal-title").textContent = deal.title;
     node.querySelector(".pi-deal-match").textContent = `Matched: ${deal.match}${
-      deal.comparable ? "" : " (different currency, compare manually)"
+      deal.approxConversion ? " (converted at an approximate exchange rate)" : ""
     }`;
-    node.querySelector(".pi-deal-price").textContent = `Listed: ${deal.currency}${deal.price.toFixed(2)}`;
-    node.querySelector(".pi-deal-value").textContent = `Typical value: $${deal.estimatedValue.toFixed(2)}`;
+    node.querySelector(".pi-deal-price").textContent = deal.approxConversion
+      ? `Listed: ${deal.currency}${deal.price.toFixed(2)} (~$${deal.priceUsd.toFixed(2)})`
+      : `Listed: $${deal.price.toFixed(2)}`;
+    node.querySelector(".pi-deal-value").textContent = `Typical value: $${deal.estimatedValueUsd.toFixed(2)}`;
     node.querySelector(".pi-deal-savings").textContent = `${deal.discountPercent}% under value`;
 
     const link = node.querySelector(".pi-deal-link");
