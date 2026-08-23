@@ -2,6 +2,7 @@ const STORAGE_KEYS = {
   recipes: "tableset-recipes",
   planner: "tableset-planner",
   selectedRecipeId: "tableset-selected-recipe-id",
+  piDealOverrides: "tableset-pi-deal-overrides",
 };
 
 const WEEK_DAYS = [
@@ -271,6 +272,70 @@ const INGREDIENT_SYNONYMS = [
   },
 ];
 
+const DEAL_THRESHOLD = 0.15;
+
+const PI_BRAND_GATE_KEYWORDS = ["raspberry pi", "rpi"];
+
+const EXCHANGE_RATES_TO_USD = { $: 1.0, "£": 1.27, "€": 1.08 };
+
+// Board keywords spell out "raspberry pi" in full (rather than a bare
+// "pi 4") so a clone board that merely mentions Raspberry Pi for
+// compatibility (e.g. "Orange Pi 4", "for Raspberry Pi") can't satisfy
+// them by coincidence.
+const DEFAULT_PI_REFERENCE_VALUES = [
+  { label: "Raspberry Pi 5 (8GB)", keywords: ["raspberry pi 5", "8gb"], value: 80, kind: "board" },
+  { label: "Raspberry Pi 5 (4GB)", keywords: ["raspberry pi 5", "4gb"], value: 60, kind: "board" },
+  { label: "Raspberry Pi 5 (2GB)", keywords: ["raspberry pi 5", "2gb"], value: 50, kind: "board" },
+  { label: "Raspberry Pi 4 Model B (8GB)", keywords: ["raspberry pi 4", "8gb"], value: 75, kind: "board" },
+  { label: "Raspberry Pi 4 Model B (4GB)", keywords: ["raspberry pi 4", "4gb"], value: 55, kind: "board" },
+  { label: "Raspberry Pi 4 Model B (2GB)", keywords: ["raspberry pi 4", "2gb"], value: 45, kind: "board" },
+  { label: "Raspberry Pi 4 Model B (1GB)", keywords: ["raspberry pi 4", "1gb"], value: 35, kind: "board" },
+  { label: "Raspberry Pi 400", keywords: ["raspberry pi 400"], value: 70, kind: "board" },
+  { label: "Raspberry Pi 3 Model B+", keywords: ["raspberry pi 3", "b+"], value: 35, kind: "board" },
+  { label: "Raspberry Pi 3 Model B", keywords: ["raspberry pi 3", "model b"], value: 30, kind: "board" },
+  { label: "Raspberry Pi 3 Model A+", keywords: ["raspberry pi 3", "model a+"], value: 25, kind: "board" },
+  { label: "Raspberry Pi 2 Model B", keywords: ["raspberry pi 2"], value: 25, kind: "board" },
+  { label: "Raspberry Pi 1 Model B+", keywords: ["raspberry pi model b+"], value: 20, kind: "board" },
+  { label: "Raspberry Pi Zero 2 W", keywords: ["raspberry pi zero 2 w"], value: 15, kind: "board" },
+  { label: "Raspberry Pi Zero W", keywords: ["raspberry pi zero w"], value: 10, kind: "board" },
+  { label: "Raspberry Pi Zero", keywords: ["raspberry pi zero"], value: 5, kind: "board" },
+  { label: "Raspberry Pi Pico 2 W", keywords: ["pico 2 w"], value: 8, kind: "board" },
+  { label: "Raspberry Pi Pico 2", keywords: ["pico 2"], value: 5, kind: "board" },
+  { label: "Raspberry Pi Pico W", keywords: ["pico w"], value: 6, kind: "board" },
+  { label: "Raspberry Pi Pico", keywords: ["pico"], value: 4, kind: "board" },
+  { label: "Raspberry Pi Compute Module 5", keywords: ["compute module 5"], value: 45, kind: "board" },
+  { label: "Raspberry Pi Compute Module 4", keywords: ["compute module 4"], value: 30, kind: "board" },
+  { label: "Raspberry Pi Camera Module 3", keywords: ["camera module 3"], value: 25, kind: "accessory" },
+  { label: "Raspberry Pi Camera Module", keywords: ["camera module"], value: 15, kind: "accessory" },
+  { label: "Raspberry Pi High Quality Camera", keywords: ["high quality camera"], value: 50, kind: "accessory" },
+  { label: "Raspberry Pi Sense HAT", keywords: ["sense hat"], value: 40, kind: "accessory" },
+  { label: "Raspberry Pi Build HAT", keywords: ["build hat"], value: 25, kind: "accessory" },
+  { label: "Raspberry Pi AI HAT+", keywords: ["ai hat"], value: 110, kind: "accessory" },
+  { label: "Raspberry Pi AI Kit", keywords: ["ai kit"], value: 70, kind: "accessory" },
+  { label: "Raspberry Pi M.2 HAT+", keywords: ["m.2 hat"], value: 15, kind: "accessory" },
+  { label: "Raspberry Pi PoE+ HAT", keywords: ["poe+ hat"], value: 20, kind: "accessory" },
+  { label: "Raspberry Pi PoE HAT", keywords: ["poe hat"], value: 18, kind: "accessory" },
+  { label: "Raspberry Pi Touch Display 2", keywords: ["touch display 2"], value: 60, kind: "accessory" },
+  { label: "Raspberry Pi Touch Display", keywords: ["touch display"], value: 55, kind: "accessory" },
+  { label: "Raspberry Pi Official Keyboard", keywords: ["official keyboard"], value: 12, kind: "accessory" },
+  { label: "Raspberry Pi Official Mouse", keywords: ["official mouse"], value: 8, kind: "accessory" },
+  { label: "Raspberry Pi Active Cooler", keywords: ["active cooler"], value: 5, kind: "accessory" },
+  {
+    label: "Raspberry Pi Official 27W USB-C Power Supply",
+    keywords: ["27w", "power supply"],
+    value: 12,
+    kind: "accessory",
+  },
+  { label: "Raspberry Pi Official Case", keywords: ["official case"], value: 10, kind: "accessory" },
+];
+
+// Accessory listings often mention a board only for compatibility ("Case for
+// Raspberry Pi 4", "Supports Raspberry Pi 3B+/4B"). Without this, that
+// mention alone can satisfy a board's keywords and get mispriced as the
+// board itself.
+const ACCESSORY_PHRASE_PATTERN =
+  /\b(?:for|supports?|compatible(?:\s+with)?|works\s+with|fits)\s+(?:the\s+)?(?:raspberry\s+pi|rpi)\b/i;
+
 const demoRecipes = [
   {
     id: crypto.randomUUID(),
@@ -343,6 +408,16 @@ const elements = {
   shoppingCount: document.querySelector("#shopping-count"),
   recipeCardTemplate: document.querySelector("#recipe-card-template"),
   shoppingItemTemplate: document.querySelector("#shopping-item-template"),
+  piDealsForm: document.querySelector("#pi-deals-form"),
+  piDealsUrl: document.querySelector("#pi-deals-url"),
+  piDealsHtml: document.querySelector("#pi-deals-html"),
+  piDealsStatus: document.querySelector("#pi-deals-status"),
+  piDealsResults: document.querySelector("#pi-deals-results"),
+  piDealCardTemplate: document.querySelector("#pi-deal-card-template"),
+  piDealsThreshold: document.querySelector("#pi-deals-threshold"),
+  piDealsValuesList: document.querySelector("#pi-deals-values-list"),
+  piDealsResetButton: document.querySelector("#pi-deals-reset-button"),
+  piDealValueRowTemplate: document.querySelector("#pi-deal-value-row-template"),
 };
 
 let state = {
@@ -352,6 +427,7 @@ let state = {
     WEEK_DAYS.reduce((days, day) => ({ ...days, [day]: "" }), {})
   ),
   selectedRecipeId: localStorage.getItem(STORAGE_KEYS.selectedRecipeId) || "",
+  piDealOverrides: readJson(STORAGE_KEYS.piDealOverrides, { threshold: null, values: {} }),
 };
 
 const IS_HOSTED_APP = window.location.protocol !== "file:";
@@ -359,6 +435,13 @@ const IS_HOSTED_APP = window.location.protocol !== "file:";
 initializeApp();
 
 async function initializeApp() {
+  if (typeof state.piDealOverrides !== "object" || state.piDealOverrides === null) {
+    state.piDealOverrides = { threshold: null, values: {} };
+  }
+  if (typeof state.piDealOverrides.values !== "object" || state.piDealOverrides.values === null) {
+    state.piDealOverrides.values = {};
+  }
+
   if (IS_HOSTED_APP) {
     await hydrateRemoteState();
   } else {
@@ -378,12 +461,16 @@ async function initializeApp() {
 
   bindEvents();
   render();
+  renderPiDealsSettings();
 }
 
 function bindEvents() {
   elements.importForm.addEventListener("submit", handleImportSubmit);
   elements.loadDemoButton.addEventListener("click", handleLoadDemoRecipes);
   elements.shareBoardButton.addEventListener("click", handleShareBoard);
+  elements.piDealsForm.addEventListener("submit", handlePiDealsSubmit);
+  elements.piDealsThreshold.addEventListener("change", handlePiDealsThresholdChange);
+  elements.piDealsResetButton.addEventListener("click", handlePiDealsResetSettings);
 }
 
 async function handleImportSubmit(event) {
@@ -477,6 +564,391 @@ async function handleShareBoard() {
   } catch (error) {
     setShareStatus("Could not create a share link from this recipe board.");
   }
+}
+
+async function handlePiDealsSubmit(event) {
+  event.preventDefault();
+  const url = elements.piDealsUrl.value.trim();
+  const htmlFallback = elements.piDealsHtml.value.trim();
+
+  if (!url && !htmlFallback) {
+    setPiDealsStatus("Add a listings page URL or paste its HTML first.");
+    return;
+  }
+
+  setPiDealsStatus("Scanning for deals...");
+
+  try {
+    const result = htmlFallback
+      ? await scanPiDeals({ html: htmlFallback, sourceUrl: url })
+      : await scanPiDeals({ url });
+
+    renderPiDeals(result.deals);
+    setPiDealsStatus(
+      result.deals.length
+        ? `Found ${result.deals.length} deal${result.deals.length === 1 ? "" : "s"} below typical value (scanned ${result.scanned} listing${result.scanned === 1 ? "" : "s"}).`
+        : `No deals below typical value were found (scanned ${result.scanned} listing${result.scanned === 1 ? "" : "s"}).`
+    );
+  } catch (error) {
+    setPiDealsStatus(error.message || "Could not scan that page for deals.");
+  }
+}
+
+async function scanPiDeals({ url = "", html = "", sourceUrl = "" }) {
+  if (IS_HOSTED_APP) {
+    return await scanPiDealsViaEndpoint({ url, html, sourceUrl });
+  }
+
+  const pageHtml = html || (await fetchListingMarkup(url));
+  const listings = parseListingsHtml(pageHtml, sourceUrl || url);
+  return evaluatePiDeals(listings);
+}
+
+async function scanPiDealsViaEndpoint({ url, html, sourceUrl }) {
+  const response = await fetch("/api/pi-deals", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      url,
+      html,
+      sourceUrl,
+      threshold: getEffectiveDealThreshold(),
+      valueOverrides: state.piDealOverrides.values,
+    }),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(
+      payload.error ||
+        "The hosted deal finder could not fetch that page. Try pasting the page HTML instead."
+    );
+  }
+
+  return payload;
+}
+
+async function fetchListingMarkup(url) {
+  if (!url) {
+    throw new Error("Add a listings page URL first.");
+  }
+
+  const directResponse = await fetch(url);
+  if (directResponse.ok) {
+    return await directResponse.text();
+  }
+
+  throw new Error(
+    "Could not fetch that URL directly. Paste the page HTML into the fallback field and scan again."
+  );
+}
+
+function parseListingsHtml(html, sourceUrl) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+  const ebayListings = extractEbayStyleListings(doc, sourceUrl);
+  return ebayListings.length ? ebayListings : extractGenericListings(doc, sourceUrl);
+}
+
+function extractEbayStyleListings(doc, sourceUrl) {
+  const listings = [];
+
+  doc.querySelectorAll("li.s-item, div.s-item, li.s-card, div.s-card").forEach((item) => {
+    const titleEl = item.querySelector(".s-item__title, .s-card__title");
+    const priceEl = item.querySelector(".s-item__price, .s-card__price");
+    const linkEl = item.querySelector("a.s-item__link, a.s-card__link") || item.querySelector("a");
+    const imageEl = item.querySelector(".s-item__image-img, .s-card__image") || item.querySelector("img");
+
+    const title = extractListingTitle(titleEl);
+    if (!title || title.toLowerCase() === "shop on ebay") {
+      return;
+    }
+
+    const price = parsePrice(priceEl?.textContent || "");
+    if (!price) {
+      return;
+    }
+
+    listings.push({
+      title,
+      price: price.amount,
+      currency: price.currency,
+      link: resolveUrl(linkEl?.getAttribute("href"), sourceUrl),
+      image: resolveUrl(imageEl?.getAttribute("src"), sourceUrl),
+      isAuction: isAuctionListing(item),
+    });
+  });
+
+  return listings;
+}
+
+function extractListingTitle(titleEl) {
+  if (!titleEl) {
+    return "";
+  }
+
+  const clone = titleEl.cloneNode(true);
+  clone.querySelectorAll(".clipped").forEach((node) => node.remove());
+  const title = normalizeText(clone.textContent);
+  return title.replace(/^New [Ll]isting\s+/, "").trim();
+}
+
+function isAuctionListing(item) {
+  // A live auction's current price is just the highest bid so far, not a
+  // price you can actually pay today, so it can't be judged as a "deal".
+  return /\d+\s+bids?\b/i.test(normalizeText(item.textContent));
+}
+
+function extractGenericListings(doc, sourceUrl) {
+  const listings = [];
+  const seenLinks = new Set();
+
+  doc.querySelectorAll("a[href]").forEach((anchor) => {
+    const anchorText = normalizeText(anchor.textContent);
+    const container = anchor.closest("li, div, article") || anchor.parentElement;
+    const contextText = normalizeText(container?.textContent || anchorText);
+
+    const price = parsePrice(contextText);
+    if (!price) {
+      return;
+    }
+
+    const title = anchorText.length > 8 ? anchorText : contextText.slice(0, 120);
+    if (!title) {
+      return;
+    }
+
+    const link = resolveUrl(anchor.getAttribute("href"), sourceUrl);
+    if (!link || seenLinks.has(link)) {
+      return;
+    }
+    seenLinks.add(link);
+
+    const imageEl = container?.querySelector("img") || anchor.querySelector("img");
+
+    listings.push({
+      title,
+      price: price.amount,
+      currency: price.currency,
+      link,
+      image: resolveUrl(imageEl?.getAttribute("src"), sourceUrl),
+      isAuction: container ? isAuctionListing(container) : false,
+    });
+  });
+
+  return listings;
+}
+
+function evaluatePiDeals(listings) {
+  const referenceValues = getEffectivePiReferenceValues();
+  const threshold = getEffectiveDealThreshold();
+
+  const deals = listings
+    .map((listing) => {
+      if (listing.isAuction) {
+        return null;
+      }
+
+      const titleLower = listing.title.toLowerCase();
+      if (!PI_BRAND_GATE_KEYWORDS.some((keyword) => titleLower.includes(keyword))) {
+        return null;
+      }
+
+      const match = matchPiReferenceValue(titleLower, referenceValues);
+      if (!match) {
+        return null;
+      }
+
+      if (match.kind === "board" && ACCESSORY_PHRASE_PATTERN.test(titleLower)) {
+        return null;
+      }
+
+      const rate = EXCHANGE_RATES_TO_USD[listing.currency];
+      if (!rate) {
+        return null;
+      }
+
+      const priceUsd = listing.price * rate;
+      if (priceUsd <= 0 || priceUsd >= match.value) {
+        return null;
+      }
+
+      const discount = (match.value - priceUsd) / match.value;
+      if (discount < threshold) {
+        return null;
+      }
+
+      return {
+        title: listing.title,
+        match: match.label,
+        price: listing.price,
+        currency: listing.currency,
+        priceUsd: Math.round(priceUsd * 100) / 100,
+        estimatedValueUsd: match.value,
+        discountPercent: Math.round(discount * 1000) / 10,
+        link: listing.link,
+        image: listing.image,
+        approxConversion: listing.currency !== "$",
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => right.discountPercent - left.discountPercent);
+
+  return { deals, scanned: listings.length };
+}
+
+function getEffectivePiReferenceValues() {
+  const overrides = state.piDealOverrides.values || {};
+  return DEFAULT_PI_REFERENCE_VALUES.map((entry) =>
+    Number.isFinite(overrides[entry.label]) ? { ...entry, value: overrides[entry.label] } : entry
+  );
+}
+
+function getEffectiveDealThreshold() {
+  return Number.isFinite(state.piDealOverrides.threshold)
+    ? state.piDealOverrides.threshold
+    : DEAL_THRESHOLD;
+}
+
+function matchPiReferenceValue(titleLower, referenceValues) {
+  let bestMatch = null;
+  let bestScore = 0;
+
+  referenceValues.forEach((entry) => {
+    if (entry.keywords.every((keyword) => titleLower.includes(keyword))) {
+      if (entry.keywords.length > bestScore) {
+        bestScore = entry.keywords.length;
+        bestMatch = entry;
+      }
+    }
+  });
+
+  return bestMatch;
+}
+
+function parsePrice(text) {
+  if (!text) {
+    return null;
+  }
+
+  const match = text.match(/([$£€])\s?(\d{1,3}(?:[,.]\d{3})*(?:\.\d{1,2})?)/);
+  if (!match) {
+    return null;
+  }
+
+  const amount = Number(match[2].replace(/,/g, ""));
+  return Number.isFinite(amount) ? { currency: match[1], amount } : null;
+}
+
+function resolveUrl(value, sourceUrl) {
+  if (!value) {
+    return "";
+  }
+
+  try {
+    return new URL(value, sourceUrl || window.location.href).toString();
+  } catch (error) {
+    return "";
+  }
+}
+
+function renderPiDeals(deals) {
+  elements.piDealsResults.innerHTML = "";
+
+  if (!deals.length) {
+    elements.piDealsResults.className = "pi-deals-results empty-state";
+    elements.piDealsResults.textContent =
+      "No deals below typical value were found. Try a different search or listings page.";
+    return;
+  }
+
+  elements.piDealsResults.className = "pi-deals-results";
+
+  deals.forEach((deal) => {
+    const node = elements.piDealCardTemplate.content.firstElementChild.cloneNode(true);
+    const imageEl = node.querySelector(".pi-deal-image");
+    if (deal.image) {
+      imageEl.src = deal.image;
+    } else {
+      imageEl.remove();
+    }
+
+    node.querySelector(".pi-deal-title").textContent = deal.title;
+    node.querySelector(".pi-deal-match").textContent = `Matched: ${deal.match}${
+      deal.approxConversion ? " (converted at an approximate exchange rate)" : ""
+    }`;
+    node.querySelector(".pi-deal-price").textContent = deal.approxConversion
+      ? `Listed: ${deal.currency}${deal.price.toFixed(2)} (~$${deal.priceUsd.toFixed(2)})`
+      : `Listed: $${deal.price.toFixed(2)}`;
+    node.querySelector(".pi-deal-value").textContent = `Typical value: $${deal.estimatedValueUsd.toFixed(2)}`;
+    node.querySelector(".pi-deal-savings").textContent = `${deal.discountPercent}% under value`;
+
+    const link = node.querySelector(".pi-deal-link");
+    link.href = deal.link || "#";
+
+    elements.piDealsResults.appendChild(node);
+  });
+}
+
+function setPiDealsStatus(message) {
+  elements.piDealsStatus.textContent = message;
+}
+
+function renderPiDealsSettings() {
+  const overrides = state.piDealOverrides.values || {};
+  elements.piDealsThreshold.value = Math.round(getEffectiveDealThreshold() * 100);
+
+  elements.piDealsValuesList.innerHTML = "";
+  DEFAULT_PI_REFERENCE_VALUES.forEach((entry) => {
+    const node = elements.piDealValueRowTemplate.content.firstElementChild.cloneNode(true);
+    node.querySelector(".pi-deal-value-row-label").textContent = entry.label;
+    const input = node.querySelector("input");
+    input.value = Number.isFinite(overrides[entry.label]) ? overrides[entry.label] : entry.value;
+    input.addEventListener("change", () => handlePiDealValueChange(entry.label, entry.value, input));
+    elements.piDealsValuesList.appendChild(node);
+  });
+}
+
+function handlePiDealValueChange(label, defaultValue, input) {
+  const parsed = Number(input.value);
+
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    input.value = defaultValue;
+    delete state.piDealOverrides.values[label];
+  } else if (parsed === defaultValue) {
+    input.value = defaultValue;
+    delete state.piDealOverrides.values[label];
+  } else {
+    state.piDealOverrides.values[label] = parsed;
+  }
+
+  savePiDealOverrides();
+}
+
+function handlePiDealsThresholdChange() {
+  const parsed = Number(elements.piDealsThreshold.value);
+
+  if (!Number.isFinite(parsed) || parsed <= 0 || parsed >= 100) {
+    state.piDealOverrides.threshold = null;
+    elements.piDealsThreshold.value = Math.round(DEAL_THRESHOLD * 100);
+  } else {
+    state.piDealOverrides.threshold = parsed / 100;
+  }
+
+  savePiDealOverrides();
+}
+
+function handlePiDealsResetSettings() {
+  state.piDealOverrides = { threshold: null, values: {} };
+  savePiDealOverrides();
+  renderPiDealsSettings();
+  setPiDealsStatus("Reference values and threshold reset to defaults.");
+}
+
+function savePiDealOverrides() {
+  localStorage.setItem(STORAGE_KEYS.piDealOverrides, JSON.stringify(state.piDealOverrides));
 }
 
 async function importRecipeFromUrl(url) {

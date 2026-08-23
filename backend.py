@@ -5,11 +5,13 @@ import os
 import uuid
 from datetime import datetime, timezone
 
+import requests
 from flask import Flask, jsonify, request, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import String, Text
 
 from recipe_importer import import_recipe_from_url, parse_recipe_html
+from pi_deals import find_deals_from_html, find_deals_from_url, DEFAULT_DEAL_THRESHOLD
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -105,6 +107,38 @@ def api_bulk_save_recipes():
     recipes = body.get("recipes") if isinstance(body.get("recipes"), list) else []
     saved = [serialize_recipe(save_recipe(sanitize_recipe_payload(recipe))) for recipe in recipes]
     return jsonify({"recipes": serialize_recipes(), "saved": saved})
+
+
+@app.post("/api/pi-deals")
+def api_pi_deals():
+    body = request.get_json(silent=True) or {}
+    html = str(body.get("html") or "")
+    source_url = str(body.get("sourceUrl") or body.get("url") or "")
+
+    threshold = body.get("threshold")
+    if not isinstance(threshold, (int, float)) or not 0 < threshold < 1:
+        threshold = DEFAULT_DEAL_THRESHOLD
+
+    raw_overrides = body.get("valueOverrides")
+    value_overrides = {
+        str(label): float(value)
+        for label, value in (raw_overrides.items() if isinstance(raw_overrides, dict) else [])
+        if isinstance(value, (int, float)) and value >= 0
+    }
+
+    try:
+        if html:
+            result = find_deals_from_html(html, source_url, threshold, value_overrides)
+        else:
+            result = find_deals_from_url(str(body.get("url") or ""), threshold, value_overrides)
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+    except requests.RequestException:
+        return jsonify(
+            {"error": "Could not fetch that listings page. Try pasting the page HTML instead."}
+        ), 502
+
+    return jsonify(result)
 
 
 @app.put("/api/planner")
