@@ -151,6 +151,27 @@
             priced below their typical market value.
           </p>
 
+          <details class="pi-deals-settings">
+            <summary>Adjust reference values</summary>
+            <div class="pi-deals-settings-body">
+              <label class="field pi-deals-threshold-field">
+                <span>Flag deals at least this far under typical value</span>
+                <div class="pi-deals-threshold-input">
+                  <input id="pi-deals-threshold" type="number" min="1" max="95" step="1" />
+                  <span>%</span>
+                </div>
+              </label>
+
+              <div id="pi-deals-values-list" class="pi-deals-values-list"></div>
+
+              <div class="import-actions">
+                <button id="pi-deals-reset-button" class="ghost-button" type="button">
+                  Reset to defaults
+                </button>
+              </div>
+            </div>
+          </details>
+
           <form id="pi-deals-form" class="import-form">
             <label class="field">
               <span>Listings page URL</span>
@@ -197,6 +218,16 @@
         <span class="shopping-item-name"></span>
         <span class="shopping-item-count"></span>
       </li>
+    </template>
+
+    <template id="pi-deal-value-row-template">
+      <label class="pi-deal-value-row">
+        <span class="pi-deal-value-row-label"></span>
+        <span class="pi-deal-value-row-input">
+          <span>$</span>
+          <input type="number" min="0" step="0.5" />
+        </span>
+      </label>
     </template>
 
     <template id="pi-deal-card-template">

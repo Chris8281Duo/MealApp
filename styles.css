@@ -273,6 +273,75 @@ body::before {
   line-height: 1.6;
 }
 
+.pi-deals-settings {
+  margin-bottom: 1.1rem;
+  border: 1px solid rgba(112, 67, 25, 0.14);
+  border-radius: 20px;
+  background: rgba(255, 249, 241, 0.55);
+  padding: 0.9rem 1.1rem;
+}
+
+.pi-deals-settings summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--primary-deep);
+}
+
+.pi-deals-settings-body {
+  margin-top: 1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.pi-deals-threshold-field {
+  max-width: 22rem;
+}
+
+.pi-deals-threshold-input {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pi-deals-threshold-input input {
+  width: 6rem;
+}
+
+.pi-deals-values-list {
+  max-height: 16rem;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.5rem;
+  padding-right: 0.4rem;
+}
+
+.pi-deal-value-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 14px;
+  background: rgba(255, 252, 247, 0.85);
+  border: 1px solid rgba(112, 67, 25, 0.08);
+}
+
+.pi-deal-value-row-label {
+  font-size: 0.92rem;
+}
+
+.pi-deal-value-row-input {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+
+.pi-deal-value-row-input input {
+  width: 5.5rem;
+  padding: 0.5rem 0.6rem;
+}
+
 .panel-heading {
   display: flex;
   justify-content: space-between;

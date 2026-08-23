@@ -114,14 +114,23 @@ def api_pi_deals():
     body = request.get_json(silent=True) or {}
     html = str(body.get("html") or "")
     source_url = str(body.get("sourceUrl") or body.get("url") or "")
+
     threshold = body.get("threshold")
-    threshold = float(threshold) if isinstance(threshold, (int, float)) else DEFAULT_DEAL_THRESHOLD
+    if not isinstance(threshold, (int, float)) or not 0 < threshold < 1:
+        threshold = DEFAULT_DEAL_THRESHOLD
+
+    raw_overrides = body.get("valueOverrides")
+    value_overrides = {
+        str(label): float(value)
+        for label, value in (raw_overrides.items() if isinstance(raw_overrides, dict) else [])
+        if isinstance(value, (int, float)) and value >= 0
+    }
 
     try:
         if html:
-            result = find_deals_from_html(html, source_url, threshold)
+            result = find_deals_from_html(html, source_url, threshold, value_overrides)
         else:
-            result = find_deals_from_url(str(body.get("url") or ""), threshold)
+            result = find_deals_from_url(str(body.get("url") or ""), threshold, value_overrides)
     except ValueError as error:
         return jsonify({"error": str(error)}), 400
     except requests.RequestException:

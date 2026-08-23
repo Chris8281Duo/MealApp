@@ -29,15 +29,33 @@ REFERENCE_VALUES = [
     {"label": "Raspberry Pi 400", "keywords": ["raspberry pi 400"], "value": 70, "kind": "board"},
     {"label": "Raspberry Pi 3 Model B+", "keywords": ["raspberry pi 3", "b+"], "value": 35, "kind": "board"},
     {"label": "Raspberry Pi 3 Model B", "keywords": ["raspberry pi 3", "model b"], "value": 30, "kind": "board"},
+    {"label": "Raspberry Pi 3 Model A+", "keywords": ["raspberry pi 3", "model a+"], "value": 25, "kind": "board"},
+    {"label": "Raspberry Pi 2 Model B", "keywords": ["raspberry pi 2"], "value": 25, "kind": "board"},
+    {"label": "Raspberry Pi 1 Model B+", "keywords": ["raspberry pi model b+"], "value": 20, "kind": "board"},
     {"label": "Raspberry Pi Zero 2 W", "keywords": ["raspberry pi zero 2 w"], "value": 15, "kind": "board"},
     {"label": "Raspberry Pi Zero W", "keywords": ["raspberry pi zero w"], "value": 10, "kind": "board"},
     {"label": "Raspberry Pi Zero", "keywords": ["raspberry pi zero"], "value": 5, "kind": "board"},
+    {"label": "Raspberry Pi Pico 2 W", "keywords": ["pico 2 w"], "value": 8, "kind": "board"},
+    {"label": "Raspberry Pi Pico 2", "keywords": ["pico 2"], "value": 5, "kind": "board"},
     {"label": "Raspberry Pi Pico W", "keywords": ["pico w"], "value": 6, "kind": "board"},
     {"label": "Raspberry Pi Pico", "keywords": ["pico"], "value": 4, "kind": "board"},
+    {"label": "Raspberry Pi Compute Module 5", "keywords": ["compute module 5"], "value": 45, "kind": "board"},
+    {"label": "Raspberry Pi Compute Module 4", "keywords": ["compute module 4"], "value": 30, "kind": "board"},
     {"label": "Raspberry Pi Camera Module 3", "keywords": ["camera module 3"], "value": 25, "kind": "accessory"},
     {"label": "Raspberry Pi Camera Module", "keywords": ["camera module"], "value": 15, "kind": "accessory"},
+    {"label": "Raspberry Pi High Quality Camera", "keywords": ["high quality camera"], "value": 50, "kind": "accessory"},
     {"label": "Raspberry Pi Sense HAT", "keywords": ["sense hat"], "value": 40, "kind": "accessory"},
-    {"label": "Raspberry Pi PoE+ HAT", "keywords": ["poe+ hat", "poe hat"], "value": 20, "kind": "accessory"},
+    {"label": "Raspberry Pi Build HAT", "keywords": ["build hat"], "value": 25, "kind": "accessory"},
+    {"label": "Raspberry Pi AI HAT+", "keywords": ["ai hat"], "value": 110, "kind": "accessory"},
+    {"label": "Raspberry Pi AI Kit", "keywords": ["ai kit"], "value": 70, "kind": "accessory"},
+    {"label": "Raspberry Pi M.2 HAT+", "keywords": ["m.2 hat"], "value": 15, "kind": "accessory"},
+    {"label": "Raspberry Pi PoE+ HAT", "keywords": ["poe+ hat"], "value": 20, "kind": "accessory"},
+    {"label": "Raspberry Pi PoE HAT", "keywords": ["poe hat"], "value": 18, "kind": "accessory"},
+    {"label": "Raspberry Pi Touch Display 2", "keywords": ["touch display 2"], "value": 60, "kind": "accessory"},
+    {"label": "Raspberry Pi Touch Display", "keywords": ["touch display"], "value": 55, "kind": "accessory"},
+    {"label": "Raspberry Pi Official Keyboard", "keywords": ["official keyboard"], "value": 12, "kind": "accessory"},
+    {"label": "Raspberry Pi Official Mouse", "keywords": ["official mouse"], "value": 8, "kind": "accessory"},
+    {"label": "Raspberry Pi Active Cooler", "keywords": ["active cooler"], "value": 5, "kind": "accessory"},
     {
         "label": "Raspberry Pi Official 27W USB-C Power Supply",
         "keywords": ["27w", "power supply"],
@@ -64,7 +82,11 @@ ACCESSORY_PHRASE_PATTERN = re.compile(
 EXCHANGE_RATES_TO_USD = {"$": 1.0, "£": 1.27, "€": 1.08}
 
 
-def find_deals_from_url(url: str, threshold: float = DEFAULT_DEAL_THRESHOLD) -> dict:
+def find_deals_from_url(
+    url: str,
+    threshold: float = DEFAULT_DEAL_THRESHOLD,
+    value_overrides: dict[str, float] | None = None,
+) -> dict:
     validated_url = validate_listing_url(url)
     response = requests.get(
         validated_url,
@@ -75,12 +97,17 @@ def find_deals_from_url(url: str, threshold: float = DEFAULT_DEAL_THRESHOLD) -> 
         timeout=20,
     )
     response.raise_for_status()
-    return find_deals_from_html(response.text, validated_url, threshold)
+    return find_deals_from_html(response.text, validated_url, threshold, value_overrides)
 
 
-def find_deals_from_html(html: str, source_url: str, threshold: float = DEFAULT_DEAL_THRESHOLD) -> dict:
+def find_deals_from_html(
+    html: str,
+    source_url: str,
+    threshold: float = DEFAULT_DEAL_THRESHOLD,
+    value_overrides: dict[str, float] | None = None,
+) -> dict:
     listings = parse_listings_html(html, source_url)
-    return evaluate_deals(listings, threshold)
+    return evaluate_deals(listings, threshold, value_overrides)
 
 
 def validate_listing_url(url: str) -> str:
@@ -196,8 +223,13 @@ def extract_generic_listings(soup: BeautifulSoup, source_url: str) -> list[dict]
     return listings
 
 
-def evaluate_deals(listings: list[dict], threshold: float = DEFAULT_DEAL_THRESHOLD) -> dict:
+def evaluate_deals(
+    listings: list[dict],
+    threshold: float = DEFAULT_DEAL_THRESHOLD,
+    value_overrides: dict[str, float] | None = None,
+) -> dict:
     deals = []
+    value_overrides = value_overrides or {}
 
     for listing in listings:
         if listing.get("isAuction"):
@@ -219,7 +251,8 @@ def evaluate_deals(listings: list[dict], threshold: float = DEFAULT_DEAL_THRESHO
             continue
 
         price = listing["price"]
-        value = match["value"]
+        override_value = value_overrides.get(match["label"])
+        value = override_value if isinstance(override_value, (int, float)) and override_value >= 0 else match["value"]
         price_usd = price * rate
         if price_usd <= 0 or price_usd >= value:
             continue
