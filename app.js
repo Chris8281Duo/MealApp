@@ -13,6 +13,7 @@ const STORAGE_KEYS = {
   recipes: "tableset-recipes",
   planner: "tableset-planner",
   selectedRecipeId: "tableset-selected-recipe-id",
+  shoppingOverrides: "tableset-shopping-overrides",
 };
 
 const WEEK_DAYS = [
@@ -106,6 +107,7 @@ const elements = {
   recipeDetail: document.querySelector("#recipe-detail"),
   weeklyMenu: document.querySelector("#weekly-menu"),
   shoppingList: document.querySelector("#shopping-list"),
+  shoppingTotal: document.querySelector("#shopping-total"),
   recipeCount: document.querySelector("#recipe-count"),
   plannedCount: document.querySelector("#planned-count"),
   shoppingCount: document.querySelector("#shopping-count"),
@@ -127,7 +129,13 @@ let state = {
   selectedRecipeId: IS_HOSTED_APP ? "" : localStorage.getItem(STORAGE_KEYS.selectedRecipeId) || "",
   editingRecipeId: null,
   desiredServings: null,
+  shoppingOverrides: readJson(STORAGE_KEYS.shoppingOverrides, { signature: "", removed: {}, prices: {} }),
 };
+
+// The items currently shown in the shopping list, kept around so a price
+// edit can recompute the total without re-rendering (and losing focus on)
+// every input on the list.
+let currentShoppingItems = [];
 
 let authMode = "login";
 
@@ -257,6 +265,8 @@ async function handleLogout() {
   state.selectedRecipeId = "";
   state.editingRecipeId = null;
   state.desiredServings = null;
+  state.shoppingOverrides = { signature: "", removed: {}, prices: {} };
+  persistShoppingOverrides();
   showAuth();
 }
 
@@ -823,15 +833,19 @@ function renderRecipeEditForm(recipe) {
 }
 
 function renderShoppingList() {
+  ensureShoppingOverridesCurrent();
+
   const selectedRecipes = WEEK_DAYS.map((day) => state.planner[day])
     .filter(Boolean)
     .map((recipeId) => state.recipes.find((recipe) => recipe.id === recipeId))
     .filter(Boolean);
 
   if (!selectedRecipes.length) {
+    currentShoppingItems = [];
     elements.shoppingList.className = "shopping-list empty-state";
     elements.shoppingList.textContent =
       "Choose recipes in the weekly menu to build a shopping list automatically.";
+    updateShoppingTotalDisplay();
     return;
   }
 
@@ -853,6 +867,7 @@ function renderShoppingList() {
   const items = Array.from(combined.values()).sort((left, right) =>
     left.label.localeCompare(right.label)
   );
+  currentShoppingItems = items;
 
   elements.shoppingList.className = "shopping-list";
   elements.shoppingList.innerHTML = "";
@@ -867,16 +882,100 @@ function renderShoppingList() {
     heading.textContent = group.label;
 
     const list = document.createElement("ul");
-    group.items.forEach((item) => {
-      const node = elements.shoppingItemTemplate.content.firstElementChild.cloneNode(true);
-      node.querySelector(".shopping-item-name").textContent = item.label;
-      node.querySelector(".shopping-item-count").textContent = formatIngredientSummary(item);
-      list.appendChild(node);
+    const sortedItems = [...group.items].sort(
+      (left, right) => Number(isItemRemoved(left)) - Number(isItemRemoved(right))
+    );
+
+    sortedItems.forEach((item) => {
+      list.appendChild(buildShoppingItemNode(item));
     });
 
     section.append(heading, list);
     elements.shoppingList.appendChild(section);
   });
+
+  updateShoppingTotalDisplay();
+}
+
+function buildShoppingItemNode(item) {
+  const node = elements.shoppingItemTemplate.content.firstElementChild.cloneNode(true);
+  const removed = isItemRemoved(item);
+
+  node.classList.toggle("shopping-item--removed", removed);
+  node.querySelector(".shopping-item-name").textContent = item.label;
+  node.querySelector(".shopping-item-count").textContent = formatIngredientSummary(item);
+
+  const priceInput = node.querySelector(".price-input");
+  const existingPrice = state.shoppingOverrides.prices[item.key];
+  priceInput.value = existingPrice === undefined || existingPrice === null ? "" : existingPrice;
+  priceInput.disabled = removed;
+  priceInput.addEventListener("input", (event) => {
+    const value = event.target.value;
+    if (value === "") {
+      delete state.shoppingOverrides.prices[item.key];
+    } else {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed) && parsed >= 0) {
+        state.shoppingOverrides.prices[item.key] = parsed;
+      }
+    }
+    persistShoppingOverrides();
+    updateShoppingTotalDisplay();
+  });
+
+  const removeButton = node.querySelector(".remove-item-button");
+  const restoreButton = node.querySelector(".restore-item-button");
+  removeButton.hidden = removed;
+  restoreButton.hidden = !removed;
+  removeButton.addEventListener("click", () => setItemRemoved(item.key, true));
+  restoreButton.addEventListener("click", () => setItemRemoved(item.key, false));
+
+  return node;
+}
+
+function isItemRemoved(item) {
+  return Boolean(state.shoppingOverrides.removed[item.key]);
+}
+
+function setItemRemoved(key, removed) {
+  if (removed) {
+    state.shoppingOverrides.removed[key] = true;
+  } else {
+    delete state.shoppingOverrides.removed[key];
+  }
+  persistShoppingOverrides();
+  renderShoppingList();
+  renderStats();
+}
+
+function updateShoppingTotalDisplay() {
+  const total = currentShoppingItems.reduce((sum, item) => {
+    if (isItemRemoved(item)) {
+      return sum;
+    }
+    const price = state.shoppingOverrides.prices[item.key];
+    return Number.isFinite(price) ? sum + price : sum;
+  }, 0);
+
+  elements.shoppingTotal.textContent = `$${total.toFixed(2)}`;
+}
+
+function getPlannerSignature() {
+  return WEEK_DAYS.map((day) => state.planner[day] || "").join("|");
+}
+
+function ensureShoppingOverridesCurrent() {
+  const signature = getPlannerSignature();
+  if (state.shoppingOverrides.signature === signature) {
+    return;
+  }
+
+  state.shoppingOverrides = { signature, removed: {}, prices: {} };
+  persistShoppingOverrides();
+}
+
+function persistShoppingOverrides() {
+  localStorage.setItem(STORAGE_KEYS.shoppingOverrides, JSON.stringify(state.shoppingOverrides));
 }
 
 function renderStats() {
@@ -895,6 +994,7 @@ function buildShoppingItemCount() {
     const recipe = state.recipes.find((entry) => entry.id === recipeId);
     recipe?.ingredients.forEach((ingredient) => set.add(parseIngredient(ingredient).key));
   });
+  Object.keys(state.shoppingOverrides.removed).forEach((key) => set.delete(key));
   return set.size;
 }
 

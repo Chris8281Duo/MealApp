@@ -320,6 +320,7 @@ export function parseIngredient(ingredient) {
 
 export function createIngredientEntry(parsed, recipeTitle) {
   return {
+    key: parsed.key,
     label: parsed.label,
     recipes: [recipeTitle],
     quantityTotal: parsed.quantity,
