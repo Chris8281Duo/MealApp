@@ -48,12 +48,12 @@ const demoRecipes = [
     servings: 4,
     ingredients: [
       "500g shelf-stable gnocchi",
-      "2 tbsp olive oil",
+      "28g olive oil",
       "3 garlic cloves, minced",
       "400g chopped tomatoes",
       "120ml vegetable stock",
       "80g baby spinach",
-      "1 handful basil leaves",
+      "15g basil leaves",
       "60g grated parmesan",
     ],
     instructions: [

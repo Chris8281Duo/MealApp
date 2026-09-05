@@ -294,18 +294,34 @@ const INGREDIENT_UNITS = [
 
 const LEADING_QUANTITY_PATTERN = /^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)(?:\s+|-)?(.*)$/;
 
+// "2 x 400g canned tomatoes" (a multi-pack count times a per-item weight/volume)
+// needs its own leading match, or the generic pattern above reads only the "2"
+// and silently drops the "400g", leaving the ingredient with no real quantity.
+const MULTIPACK_PATTERN = /^(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*(g|kg|ml|l)\b\s*(.*)$/;
+
 export function parseIngredient(ingredient) {
   const cleaned = normalizeIngredientLabel(ingredient);
-  const quantityMatch = cleaned.match(LEADING_QUANTITY_PATTERN);
-  const quantity = quantityMatch ? parseIngredientQuantity(quantityMatch[1]) : null;
-  const remainder = quantityMatch ? quantityMatch[2].trim() : cleaned;
-  const tokens = remainder.split(/\s+/).filter(Boolean);
-  const firstToken = tokens[0] || "";
-  const unit = isIngredientUnit(firstToken) ? singularizeWord(firstToken) : "";
-  const nameTokens = unit ? tokens.slice(1) : tokens;
-  const ingredientName = canonicalizeIngredientName(
-    nameTokens.join(" ") || remainder || cleaned
-  );
+  const multipackMatch = cleaned.match(MULTIPACK_PATTERN);
+
+  let quantity;
+  let unit;
+  let remainder;
+
+  if (multipackMatch) {
+    quantity = Number(multipackMatch[1]) * Number(multipackMatch[2]);
+    unit = multipackMatch[3];
+    remainder = multipackMatch[4].trim();
+  } else {
+    const quantityMatch = cleaned.match(LEADING_QUANTITY_PATTERN);
+    quantity = quantityMatch ? parseIngredientQuantity(quantityMatch[1]) : null;
+    const afterQuantity = quantityMatch ? quantityMatch[2].trim() : cleaned;
+    const tokens = afterQuantity.split(/\s+/).filter(Boolean);
+    const firstToken = tokens[0] || "";
+    unit = isIngredientUnit(firstToken) ? singularizeWord(firstToken) : "";
+    remainder = (unit ? tokens.slice(1) : tokens).join(" ") || afterQuantity;
+  }
+
+  const ingredientName = canonicalizeIngredientName(remainder || cleaned);
   const label = titleCaseIngredient(ingredientName);
   const key = normalizeIngredientKey(ingredientName);
 

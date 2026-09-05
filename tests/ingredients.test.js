@@ -61,6 +61,14 @@ describe("parseIngredient", () => {
     const parsed = parseIngredient("2 x 400g canned cannellini beans, drained");
     assert.equal(parsed.key, "canned cannellini bean");
   });
+
+  test("multiplies out a multi-pack quantity instead of dropping the per-item weight", () => {
+    const multipack = parseIngredient("2 x 400g canned cannellini beans, drained");
+    const single = parseIngredient("400g canned cannellini beans, drained");
+    assert.equal(multipack.quantity, 800);
+    assert.equal(multipack.unit, "g");
+    assert.equal(multipack.key, single.key);
+  });
 });
 
 describe("mergeIngredientEntry unit conversion", () => {
