@@ -453,16 +453,21 @@ export function canonicalizeIngredientName(value) {
 
 export function stripIngredientDescriptors(value) {
   return String(value || "")
+    // "x 400g" (a leading count already stripped by the caller) needs to go
+    // before the plain digit+unit pattern below, or the bare "x" pattern
+    // eats the digits and strands the unit letter (e.g. "g canned beans").
+    .replace(/\bx\s*\d+(?:\.\d+)?\s*(g|kg|ml|l)?\b/g, " ")
     .replace(/\b\d+\s*x\s*/g, " ")
     .replace(/\bx\s+\d+/g, " ")
     .replace(/\b\d+(?:\.\d+)?\s*(g|kg|ml|l)\b/g, " ")
     .replace(/\b(heaped|level|pinch)\b/g, " ")
     .replace(/\b(powdered|ground)\b/g, " ")
-    .replace(/\bcut into strips\b/g, " ")
-    .replace(/\bcut into pieces\b/g, " ")
-    .replace(/\bcut into chunks\b/g, " ")
+    .replace(/\b(cut|sliced) into (strips|pieces|chunks|cubes)\b/g, " ")
+    .replace(/\bplus extra( for \w+)?\b/g, " ")
+    .replace(/\bfor (frying|dusting|serving|drizzling|topping)\b/g, " ")
+    .replace(/\b(kept warm|to serve|to taste)\b/g, " ")
     .replace(
-      /\b(of|and|or|very|fresh|large|small|medium|extra|to taste|optional|sweet|smoked|crushed|chopped|finely|roughly|thinly|minced|diced|sliced|grated|deseeded|seeded|peeled|skinless|boneless|can|cans|tin|tins)\b/g,
+      /\b(of|and|or|very|fresh|large|small|medium|extra|optional|sweet|smoked|crushed|chopped|finely|roughly|thinly|minced|diced|sliced|grated|deseeded|seeded|peeled|skinless|boneless|can|cans|tin|tins|beaten|separated|fried|pounded|thin|torn|shredded|cubed|quartered|halved|crumbled|wilted|cooked|drained|warmed|roasted)\b/g,
       " "
     );
 }

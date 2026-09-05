@@ -36,6 +36,31 @@ describe("parseIngredient", () => {
     assert.equal(parsed.quantity, null);
     assert.equal(parsed.unit, "");
   });
+
+  test("merges prep-method phrasing that describes the same ingredient", () => {
+    const egg = parseIngredient("1 egg");
+    const beaten = parseIngredient("4 eggs, beaten");
+    const separated = parseIngredient("2 eggs, separated");
+    assert.equal(beaten.key, egg.key);
+    assert.equal(separated.key, egg.key);
+
+    const breast = parseIngredient("500g boneless chicken breast");
+    const strips = parseIngredient("600g chicken breast, sliced into strips");
+    const pounded = parseIngredient("4 chicken breasts, pounded thin");
+    assert.equal(strips.key, breast.key);
+    assert.equal(pounded.key, breast.key);
+  });
+
+  test("keeps egg yolks distinct from whole eggs", () => {
+    const egg = parseIngredient("1 egg");
+    const yolks = parseIngredient("4 egg yolks");
+    assert.notEqual(yolks.key, egg.key);
+  });
+
+  test("does not strand a unit letter when a count-of-cans quantity is stripped", () => {
+    const parsed = parseIngredient("2 x 400g canned cannellini beans, drained");
+    assert.equal(parsed.key, "canned cannellini bean");
+  });
 });
 
 describe("mergeIngredientEntry unit conversion", () => {
