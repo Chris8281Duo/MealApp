@@ -328,6 +328,48 @@ body::before {
   font-weight: 600;
 }
 
+.household-settings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  margin-bottom: 1.1rem;
+  border-radius: 18px;
+  background: rgba(255, 250, 243, 0.7);
+  border: 1px solid var(--line);
+}
+
+.field-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+
+.field-inline input {
+  width: 4.5rem;
+  padding: 0.5rem 0.6rem;
+}
+
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+
+.checkbox-field input {
+  width: auto;
+}
+
+.household-hint {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
 input,
 textarea,
 select {

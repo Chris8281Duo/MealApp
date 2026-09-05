@@ -145,6 +145,26 @@
             </div>
           </div>
 
+          <div class="household-settings">
+            <label class="field-inline">
+              <span>Adults</span>
+              <input type="number" id="household-adults" min="0" value="0" />
+            </label>
+            <label class="field-inline">
+              <span>Children</span>
+              <input type="number" id="household-children" min="0" value="0" />
+            </label>
+            <label class="checkbox-field">
+              <input type="checkbox" id="household-children-share" />
+              Children share a parent's portion instead of having their own
+            </label>
+            <p class="household-hint">
+              Recipes default to serving
+              <strong id="household-total">&mdash;</strong>
+              based on your household, unless you set a different amount on a recipe.
+            </p>
+          </div>
+
           <div id="weekly-menu" class="weekly-menu"></div>
         </section>
 

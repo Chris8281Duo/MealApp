@@ -15,6 +15,7 @@ const STORAGE_KEYS = {
   selectedRecipeId: "tableset-selected-recipe-id",
   shoppingOverrides: "tableset-shopping-overrides",
   desiredServings: "tableset-desired-servings",
+  household: "tableset-household",
 };
 
 const WEEK_DAYS = [
@@ -118,6 +119,10 @@ const elements = {
   loadDemoButton: document.querySelector("#load-demo-button"),
   shareBoardButton: document.querySelector("#share-board-button"),
   recipeSearch: document.querySelector("#recipe-search"),
+  householdAdults: document.querySelector("#household-adults"),
+  householdChildren: document.querySelector("#household-children"),
+  householdChildrenShare: document.querySelector("#household-children-share"),
+  householdTotal: document.querySelector("#household-total"),
   recipeLibrary: document.querySelector("#recipe-library"),
   recipeDetail: document.querySelector("#recipe-detail"),
   weeklyMenu: document.querySelector("#weekly-menu"),
@@ -144,6 +149,7 @@ let state = {
   selectedRecipeId: IS_HOSTED_APP ? "" : localStorage.getItem(STORAGE_KEYS.selectedRecipeId) || "",
   editingRecipeId: null,
   desiredServingsByRecipe: readJson(STORAGE_KEYS.desiredServings, {}),
+  household: readJson(STORAGE_KEYS.household, { adults: 0, children: 0, childrenShare: false }),
   shoppingOverrides: readJson(STORAGE_KEYS.shoppingOverrides, { signature: "", removed: {}, prices: {} }),
 };
 
@@ -202,6 +208,9 @@ function bindEvents() {
     recipeSearchTerm = event.target.value.trim().toLowerCase();
     renderRecipeLibrary();
   });
+  elements.householdAdults.addEventListener("change", handleHouseholdChange);
+  elements.householdChildren.addEventListener("change", handleHouseholdChange);
+  elements.householdChildrenShare.addEventListener("change", handleHouseholdChange);
 }
 
 function showApp() {
@@ -659,6 +668,7 @@ async function buildShareUrl() {
 }
 
 function render() {
+  renderHouseholdSettings();
   renderWeeklyMenu();
   renderRecipeLibrary();
   renderRecipeDetail();
@@ -1036,10 +1046,44 @@ function persistShoppingOverrides() {
   localStorage.setItem(STORAGE_KEYS.shoppingOverrides, JSON.stringify(state.shoppingOverrides));
 }
 
-// Falls back to the recipe's saved serving size until the user picks a
-// different scale for it from the recipe card or the detail view.
+// A recipe-specific override always wins; otherwise default to the
+// household size (if set) before falling back to the recipe's own
+// saved serving count.
 function getDesiredServings(recipe) {
-  return state.desiredServingsByRecipe[recipe.id] || recipe.servings || null;
+  return (
+    state.desiredServingsByRecipe[recipe.id] ||
+    getHouseholdServings() ||
+    recipe.servings ||
+    null
+  );
+}
+
+function getHouseholdServings() {
+  const adults = Math.max(0, Number(state.household.adults) || 0);
+  const children = Math.max(0, Number(state.household.children) || 0);
+  const total = adults + (state.household.childrenShare ? 0 : children);
+  return total > 0 ? total : null;
+}
+
+function handleHouseholdChange() {
+  state.household = {
+    adults: Math.max(0, Number(elements.householdAdults.value) || 0),
+    children: Math.max(0, Number(elements.householdChildren.value) || 0),
+    childrenShare: elements.householdChildrenShare.checked,
+  };
+  persistHousehold();
+  render();
+}
+
+function persistHousehold() {
+  localStorage.setItem(STORAGE_KEYS.household, JSON.stringify(state.household));
+}
+
+function renderHouseholdSettings() {
+  elements.householdAdults.value = state.household.adults;
+  elements.householdChildren.value = state.household.children;
+  elements.householdChildrenShare.checked = state.household.childrenShare;
+  elements.householdTotal.textContent = getHouseholdServings() || "—";
 }
 
 function setDesiredServings(recipeId, rawValue) {
