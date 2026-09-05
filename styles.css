@@ -508,14 +508,21 @@ select:focus {
 
 .shopping-item {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 1rem;
-  align-items: baseline;
+  gap: 0.7rem;
+  align-items: center;
   padding: 0.95rem 1rem;
   border-radius: 18px;
   background:
     linear-gradient(90deg, rgba(255, 247, 236, 0.95), rgba(245, 234, 219, 0.9));
   border: 1px solid rgba(112, 67, 25, 0.1);
+}
+
+.shopping-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
 }
 
 .shopping-item-name {
@@ -525,6 +532,111 @@ select:focus {
 .shopping-item-count {
   color: var(--highlight);
   font-size: 0.92rem;
+}
+
+.shopping-item-price {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.shopping-item-price .price-input {
+  width: 4.5rem;
+  padding: 0.4rem 0.5rem;
+}
+
+.shopping-item--removed {
+  opacity: 0.55;
+}
+
+.shopping-item--removed .shopping-item-name,
+.shopping-item--removed .shopping-item-count {
+  text-decoration: line-through;
+}
+
+.shopping-total {
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--primary-deep);
+  white-space: nowrap;
+}
+
+.shopping-hint {
+  margin: -0.5rem 0 1rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.shopping-item .ghost-button {
+  padding: 0.5rem 0.85rem;
+  font-size: 0.85rem;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.user-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.9rem;
+  margin-bottom: 1rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.auth-panel {
+  max-width: 32rem;
+  margin: 2rem auto;
+}
+
+.detail-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+}
+
+.detail-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.danger-button {
+  color: #9a3412;
+  border-color: rgba(154, 52, 18, 0.3);
+}
+
+.servings-control {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.servings-control label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+
+.servings-control input {
+  width: 4.5rem;
+  padding: 0.5rem 0.6rem;
+}
+
+.servings-base {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.recipe-edit-form textarea {
+  min-height: 6rem;
 }
 
 @media (max-width: 1024px) {

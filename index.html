@@ -8,52 +8,89 @@
   </head>
   <body>
     <div class="page-shell">
-      <header class="hero">
-        <div class="hero-copy">
-          <div class="hero-badge-row">
-            <p class="eyebrow">Recipe library + weekly meal planning</p>
-            <span class="season-tag">Kitchen notebook</span>
-          </div>
-          <h1>Turn recipe links into a warm, lived-in food plan.</h1>
-          <p class="hero-text">
-            Keep the recipes you love, shape a week of comforting meals, and let the
-            shopping list gather itself as your table starts to take shape.
-          </p>
-          <div class="hero-notes">
-            <div class="hero-note">
-              <span class="hero-note-label">This week</span>
-              <strong>Choose dinners for every day</strong>
-            </div>
-            <div class="hero-note">
-              <span class="hero-note-label">Shopping</span>
-              <strong>Shared ingredients merge together</strong>
-            </div>
-          </div>
-          <div class="hero-actions">
-            <button id="share-board-button" class="ghost-button" type="button">Create share link</button>
-            <p id="share-status" class="status-text" aria-live="polite"></p>
-          </div>
-        </div>
-        <div class="hero-stat-grid">
-          <section class="hero-stat">
-            <span class="stat-label">Recipes saved</span>
-            <strong id="recipe-count">0</strong>
-          </section>
-          <section class="hero-stat">
-            <span class="stat-label">Meals planned</span>
-            <strong id="planned-count">0</strong>
-          </section>
-          <section class="hero-stat">
-            <span class="stat-label">Shopping items</span>
-            <strong id="shopping-count">0</strong>
-          </section>
-          <section class="hero-card">
-            <p>Built to feel like a recipe box, meal board, and handwritten shopping list in one place.</p>
-          </section>
-        </div>
-      </header>
+      <div id="user-bar" class="user-bar hidden">
+        <span id="user-email"></span>
+        <button id="logout-button" class="ghost-button" type="button">Log out</button>
+      </div>
 
-      <main class="main-grid">
+      <section id="auth-panel" class="panel auth-panel hidden">
+        <div class="panel-heading">
+          <div>
+            <p class="kicker">Account</p>
+            <h2 id="auth-heading">Sign in to your meal board</h2>
+          </div>
+          <button id="auth-toggle-mode" class="ghost-button" type="button">Need an account? Register</button>
+        </div>
+        <form id="auth-form" class="import-form">
+          <label class="field">
+            <span>Email</span>
+            <input id="auth-email" name="email" type="email" required autocomplete="username" />
+          </label>
+          <label class="field">
+            <span>Password</span>
+            <input
+              id="auth-password"
+              name="password"
+              type="password"
+              required
+              minlength="8"
+              autocomplete="current-password"
+            />
+          </label>
+          <div class="import-actions">
+            <button id="auth-submit" class="primary-button" type="submit">Sign in</button>
+            <p id="auth-status" class="status-text" aria-live="polite"></p>
+          </div>
+        </form>
+      </section>
+
+      <div id="app-shell">
+        <header class="hero">
+          <div class="hero-copy">
+            <div class="hero-badge-row">
+              <p class="eyebrow">Recipe library + weekly meal planning</p>
+              <span class="season-tag">Kitchen notebook</span>
+            </div>
+            <h1>Turn recipe links into a warm, lived-in food plan.</h1>
+            <p class="hero-text">
+              Keep the recipes you love, shape a week of comforting meals, and let the
+              shopping list gather itself as your table starts to take shape.
+            </p>
+            <div class="hero-notes">
+              <div class="hero-note">
+                <span class="hero-note-label">This week</span>
+                <strong>Choose dinners for every day</strong>
+              </div>
+              <div class="hero-note">
+                <span class="hero-note-label">Shopping</span>
+                <strong>Shared ingredients merge together</strong>
+              </div>
+            </div>
+            <div class="hero-actions">
+              <button id="share-board-button" class="ghost-button" type="button">Create share link</button>
+              <p id="share-status" class="status-text" aria-live="polite"></p>
+            </div>
+          </div>
+          <div class="hero-stat-grid">
+            <section class="hero-stat">
+              <span class="stat-label">Recipes saved</span>
+              <strong id="recipe-count">0</strong>
+            </section>
+            <section class="hero-stat">
+              <span class="stat-label">Meals planned</span>
+              <strong id="planned-count">0</strong>
+            </section>
+            <section class="hero-stat">
+              <span class="stat-label">Shopping items</span>
+              <strong id="shopping-count">0</strong>
+            </section>
+            <section class="hero-card">
+              <p>Built to feel like a recipe box, meal board, and handwritten shopping list in one place.</p>
+            </section>
+          </div>
+        </header>
+
+        <main class="main-grid">
         <section class="panel import-panel">
           <div class="panel-heading">
             <div>
@@ -120,7 +157,11 @@
                 <p class="kicker">Shopping list</p>
                 <h2>Auto-generated ingredients</h2>
               </div>
+              <span id="shopping-total" class="shopping-total">$0.00</span>
             </div>
+            <p class="shopping-hint">
+              Already have something at home? Remove it from the list and the total updates.
+            </p>
             <div id="shopping-list" class="shopping-list"></div>
           </section>
         </section>
@@ -137,7 +178,8 @@
             and method here.
           </article>
         </section>
-      </main>
+        </main>
+      </div>
     </div>
 
     <template id="recipe-card-template">
@@ -149,11 +191,19 @@
 
     <template id="shopping-item-template">
       <li class="shopping-item">
-        <span class="shopping-item-name"></span>
-        <span class="shopping-item-count"></span>
+        <div class="shopping-item-main">
+          <span class="shopping-item-name"></span>
+          <span class="shopping-item-count"></span>
+        </div>
+        <label class="shopping-item-price">
+          <span>$</span>
+          <input type="number" class="price-input" step="0.01" min="0" inputmode="decimal" placeholder="0.00" />
+        </label>
+        <button class="remove-item-button ghost-button" type="button">Remove</button>
+        <button class="restore-item-button ghost-button" type="button" hidden>Add back</button>
       </li>
     </template>
 
-    <script src="./app.js"></script>
+    <script type="module" src="./app.js"></script>
   </body>
 </html>

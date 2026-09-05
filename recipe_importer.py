@@ -1,21 +1,43 @@
 from __future__ import annotations
 
+import ipaddress
 import json
-from urllib.parse import urlparse
+import re
+import socket
+from urllib.parse import urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
 
+MAX_REDIRECTS = 5
+
 
 def import_recipe_from_url(url: str) -> dict:
     validated_url = validate_recipe_url(url)
-    response = requests.get(
-        validated_url,
-        headers={"Accept": "text/html,application/xhtml+xml"},
-        timeout=20,
-    )
-    response.raise_for_status()
-    return parse_recipe_html(response.text, validated_url)
+    final_url, html = fetch_recipe_url(validated_url)
+    return parse_recipe_html(html, final_url)
+
+
+def fetch_recipe_url(url: str) -> tuple[str, str]:
+    current_url = url
+
+    for _ in range(MAX_REDIRECTS + 1):
+        response = requests.get(
+            current_url,
+            headers={"Accept": "text/html,application/xhtml+xml"},
+            timeout=20,
+            allow_redirects=False,
+        )
+
+        location = response.headers.get("Location")
+        if response.is_redirect and location:
+            current_url = validate_recipe_url(urljoin(current_url, location))
+            continue
+
+        response.raise_for_status()
+        return current_url, response.text
+
+    raise ValueError("That recipe URL redirected too many times.")
 
 
 def parse_recipe_html(html: str, source_url: str) -> dict:
@@ -33,10 +55,34 @@ def validate_recipe_url(url: str) -> str:
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"}:
         raise ValueError("Only http and https recipe URLs are supported.")
-    if not parsed.netloc:
+    if not parsed.hostname:
         raise ValueError("That recipe URL is not valid.")
 
+    ensure_hostname_is_public(parsed.hostname)
     return url
+
+
+def ensure_hostname_is_public(hostname: str) -> None:
+    try:
+        infos = socket.getaddrinfo(hostname, None)
+    except socket.gaierror:
+        raise ValueError("That recipe URL could not be resolved.")
+
+    addresses = {info[4][0] for info in infos}
+    if not addresses:
+        raise ValueError("That recipe URL could not be resolved.")
+
+    for address in addresses:
+        ip = ipaddress.ip_address(address)
+        if (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_multicast
+            or ip.is_reserved
+            or ip.is_unspecified
+        ):
+            raise ValueError("That recipe URL points to a restricted address.")
 
 
 def extract_recipe_from_json_ld(soup: BeautifulSoup, source_url: str) -> dict | None:
@@ -63,6 +109,7 @@ def extract_recipe_from_json_ld(soup: BeautifulSoup, source_url: str) -> dict | 
     description = normalize_text(recipe_node.get("description"))
     title = normalize_text(recipe_node.get("name")) or infer_title_from_url(source_url)
     image = normalize_image(recipe_node.get("image"))
+    servings = extract_servings(recipe_node.get("recipeYield"))
 
     return {
         "title": title,
@@ -72,6 +119,7 @@ def extract_recipe_from_json_ld(soup: BeautifulSoup, source_url: str) -> dict | 
         "instructions": instructions,
         "method": " ".join(instructions),
         "image": image,
+        "servings": servings,
     }
 
 
@@ -92,6 +140,7 @@ def extract_recipe_from_visible_html(soup: BeautifulSoup, source_url: str) -> di
         "instructions": instructions,
         "method": " ".join(instructions),
         "image": "",
+        "servings": None,
     }
 
 
@@ -192,6 +241,20 @@ def normalize_image(raw: object) -> str:
     return ""
 
 
+def extract_servings(raw: object) -> int | None:
+    """recipeYield can be "4", "4 servings", or a list of those; pull the first number out."""
+    if raw is None:
+        return None
+
+    values = raw if isinstance(raw, list) else [raw]
+    for value in values:
+        match = re.search(r"\d+", str(value))
+        if match:
+            return int(match.group())
+
+    return None
+
+
 def infer_title_from_url(url: str) -> str:
     try:
         path = [part for part in urlparse(url).path.split("/") if part][-1]
@@ -202,4 +265,5 @@ def infer_title_from_url(url: str) -> str:
 
 
 def normalize_text(value: object) -> str:
-    return str(value or "").replace("\xa0", " ").strip()
+    text = str(value or "").replace("\xa0", " ")
+    return re.sub(r"\s+", " ", text).strip()
