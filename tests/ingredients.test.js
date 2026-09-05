@@ -129,6 +129,11 @@ describe("scaleIngredientText", () => {
   test("is a no-op for a scale factor of 1", () => {
     assert.equal(scaleIngredientText("2 cups flour", 1), "2 cups flour");
   });
+
+  test("scales a quantity written directly against its unit, no space", () => {
+    assert.equal(scaleIngredientText("400ml coconut milk", 1.5), "600ml coconut milk");
+    assert.equal(scaleIngredientText("500g gnocchi", 2), "1000g gnocchi");
+  });
 });
 
 describe("canonicalizeIngredientName / singularizeWord", () => {

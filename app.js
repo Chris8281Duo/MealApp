@@ -14,6 +14,7 @@ const STORAGE_KEYS = {
   planner: "tableset-planner",
   selectedRecipeId: "tableset-selected-recipe-id",
   shoppingOverrides: "tableset-shopping-overrides",
+  desiredServings: "tableset-desired-servings",
 };
 
 const WEEK_DAYS = [
@@ -141,7 +142,7 @@ let state = {
       ),
   selectedRecipeId: IS_HOSTED_APP ? "" : localStorage.getItem(STORAGE_KEYS.selectedRecipeId) || "",
   editingRecipeId: null,
-  desiredServings: null,
+  desiredServingsByRecipe: readJson(STORAGE_KEYS.desiredServings, {}),
   shoppingOverrides: readJson(STORAGE_KEYS.shoppingOverrides, { signature: "", removed: {}, prices: {} }),
 };
 
@@ -277,8 +278,9 @@ async function handleLogout() {
   state.planner = WEEK_DAYS.reduce((days, day) => ({ ...days, [day]: "" }), {});
   state.selectedRecipeId = "";
   state.editingRecipeId = null;
-  state.desiredServings = null;
+  state.desiredServingsByRecipe = {};
   state.shoppingOverrides = { signature: "", removed: {}, prices: {} };
+  persistDesiredServings();
   persistShoppingOverrides();
   showAuth();
 }
@@ -469,7 +471,8 @@ function upsertRecipe(recipe) {
     state.selectedRecipeId = recipe.id;
   }
 
-  state.desiredServings = null;
+  delete state.desiredServingsByRecipe[state.selectedRecipeId];
+  persistDesiredServings();
   persistState();
   render();
 }
@@ -477,7 +480,6 @@ function upsertRecipe(recipe) {
 function handleSelectRecipe(recipeId) {
   state.selectedRecipeId = recipeId;
   state.editingRecipeId = null;
-  state.desiredServings = null;
   persistState();
   renderRecipeLibrary();
   renderRecipeDetail();
@@ -531,7 +533,8 @@ async function handleSaveRecipeEdit(event, recipeId) {
     }
 
     state.editingRecipeId = null;
-    state.desiredServings = null;
+    delete state.desiredServingsByRecipe[recipeId];
+    persistDesiredServings();
     persistState();
     render();
     setStatus(`Saved changes to "${updated.title}".`);
@@ -572,9 +575,10 @@ async function handleDeleteRecipe(recipeId) {
 
     if (state.selectedRecipeId === recipeId) {
       state.selectedRecipeId = state.recipes[0]?.id || "";
-      state.desiredServings = null;
     }
     state.editingRecipeId = null;
+    delete state.desiredServingsByRecipe[recipeId];
+    persistDesiredServings();
     persistState();
     render();
     setStatus(`Deleted "${recipe.title}".`);
@@ -711,7 +715,21 @@ function renderRecipeLibrary() {
     node.querySelector(".recipe-card-title").textContent = recipe.title;
     node.querySelector(".recipe-card-meta").textContent = `${recipe.ingredients.length} ingredients | ${recipe.instructions.length} steps`;
     node.classList.toggle("active", recipe.id === state.selectedRecipeId);
-    node.addEventListener("click", () => handleSelectRecipe(recipe.id));
+    node.querySelector(".recipe-card-select").addEventListener("click", () => handleSelectRecipe(recipe.id));
+
+    const servingsLabel = node.querySelector(".recipe-card-servings");
+    const servingsInput = node.querySelector(".recipe-card-servings-input");
+    if (recipe.servings) {
+      servingsInput.value = getDesiredServings(recipe) || recipe.servings;
+      servingsInput.addEventListener("click", (event) => event.stopPropagation());
+      servingsInput.addEventListener("change", (event) => {
+        event.stopPropagation();
+        setDesiredServings(recipe.id, event.target.value);
+      });
+    } else {
+      servingsLabel.hidden = true;
+    }
+
     elements.recipeLibrary.appendChild(node);
   });
 }
@@ -732,11 +750,8 @@ function renderRecipeDetail() {
     return;
   }
 
-  if (!state.desiredServings && recipe.servings) {
-    state.desiredServings = recipe.servings;
-  }
-
-  const factor = recipe.servings && state.desiredServings ? state.desiredServings / recipe.servings : 1;
+  const desiredServings = getDesiredServings(recipe);
+  const factor = recipe.servings && desiredServings ? desiredServings / recipe.servings : 1;
 
   const ingredientsMarkup = recipe.ingredients
     .map((ingredient) => `<li>${escapeHtml(scaleIngredientText(ingredient, factor))}</li>`)
@@ -753,7 +768,7 @@ function renderRecipeDetail() {
   const servingsControlMarkup = recipe.servings
     ? `<div class="servings-control">
         <label>Scale ingredients to
-          <input type="number" id="servings-input" min="1" value="${state.desiredServings || recipe.servings}" />
+          <input type="number" id="servings-input" min="1" value="${desiredServings || recipe.servings}" />
           servings
         </label>
         <span class="servings-base">Recipe as saved serves ${recipe.servings}.</span>
@@ -798,9 +813,7 @@ function renderRecipeDetail() {
 
   const servingsInput = elements.recipeDetail.querySelector("#servings-input");
   servingsInput?.addEventListener("change", (event) => {
-    const value = Number(event.target.value);
-    state.desiredServings = Number.isFinite(value) && value > 0 ? value : recipe.servings;
-    renderRecipeDetail();
+    setDesiredServings(recipe.id, event.target.value);
   });
 }
 
@@ -865,8 +878,11 @@ function renderShoppingList() {
   const combined = new Map();
 
   selectedRecipes.forEach((recipe) => {
+    const desiredServings = getDesiredServings(recipe);
+    const factor = recipe.servings && desiredServings ? desiredServings / recipe.servings : 1;
+
     recipe.ingredients.forEach((ingredient) => {
-      const parsed = parseIngredient(ingredient);
+      const parsed = parseIngredient(scaleIngredientText(ingredient, factor));
       const current = combined.get(parsed.key);
       if (current) {
         mergeIngredientEntry(current, parsed, recipe.title);
@@ -989,6 +1005,38 @@ function ensureShoppingOverridesCurrent() {
 
 function persistShoppingOverrides() {
   localStorage.setItem(STORAGE_KEYS.shoppingOverrides, JSON.stringify(state.shoppingOverrides));
+}
+
+// Falls back to the recipe's saved serving size until the user picks a
+// different scale for it from the recipe card or the detail view.
+function getDesiredServings(recipe) {
+  return state.desiredServingsByRecipe[recipe.id] || recipe.servings || null;
+}
+
+function setDesiredServings(recipeId, rawValue) {
+  const recipe = state.recipes.find((entry) => entry.id === recipeId);
+  const value = Number(rawValue);
+  const normalized = Number.isFinite(value) && value > 0 ? Math.round(value) : recipe?.servings || null;
+
+  if (recipe && normalized === recipe.servings) {
+    delete state.desiredServingsByRecipe[recipeId];
+  } else if (normalized) {
+    state.desiredServingsByRecipe[recipeId] = normalized;
+  }
+  persistDesiredServings();
+
+  renderRecipeLibrary();
+  if (state.selectedRecipeId === recipeId) {
+    renderRecipeDetail();
+  }
+  if (WEEK_DAYS.some((day) => state.planner[day] === recipeId)) {
+    renderShoppingList();
+    renderStats();
+  }
+}
+
+function persistDesiredServings() {
+  localStorage.setItem(STORAGE_KEYS.desiredServings, JSON.stringify(state.desiredServingsByRecipe));
 }
 
 function renderStats() {

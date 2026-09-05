@@ -528,7 +528,9 @@ export function scaleIngredientText(text, factor) {
     return text;
   }
 
-  const match = text.match(/^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)(\s|$)/);
+  // No trailing space/end-of-string requirement: units are often written
+  // directly against the number ("400g", "500ml") rather than with a space.
+  const match = text.match(/^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)/);
   if (!match) {
     return text;
   }

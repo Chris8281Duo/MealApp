@@ -183,10 +183,16 @@
     </div>
 
     <template id="recipe-card-template">
-      <button class="recipe-card" type="button">
-        <span class="recipe-card-title"></span>
-        <span class="recipe-card-meta"></span>
-      </button>
+      <div class="recipe-card">
+        <button class="recipe-card-select" type="button">
+          <span class="recipe-card-title"></span>
+          <span class="recipe-card-meta"></span>
+        </button>
+        <label class="recipe-card-servings">
+          Serves
+          <input type="number" class="recipe-card-servings-input" min="1" />
+        </label>
+      </div>
     </template>
 
     <template id="shopping-item-template">
