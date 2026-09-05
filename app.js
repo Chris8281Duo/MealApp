@@ -498,6 +498,7 @@ function handleCancelEdit() {
 async function handleSaveRecipeEdit(event, recipeId) {
   event.preventDefault();
   const statusEl = document.querySelector("#edit-status");
+  const existingRecipe = state.recipes.find((entry) => entry.id === recipeId);
   const updated = {
     id: recipeId,
     title: document.querySelector("#edit-title").value.trim(),
@@ -506,6 +507,8 @@ async function handleSaveRecipeEdit(event, recipeId) {
     ingredients: splitLines(document.querySelector("#edit-ingredients").value),
     instructions: splitLines(document.querySelector("#edit-instructions").value),
     method: document.querySelector("#edit-method").value.trim(),
+    image: existingRecipe?.image || "",
+    rating: existingRecipe?.rating || 0,
   };
 
   if (!updated.title) {
@@ -717,6 +720,8 @@ function renderRecipeLibrary() {
     node.classList.toggle("active", recipe.id === state.selectedRecipeId);
     node.querySelector(".recipe-card-select").addEventListener("click", () => handleSelectRecipe(recipe.id));
 
+    bindStarRating(node.querySelector(".recipe-card-rating"), recipe);
+
     const servingsLabel = node.querySelector(".recipe-card-servings");
     const servingsInput = node.querySelector(".recipe-card-servings-input");
     if (recipe.servings) {
@@ -784,6 +789,13 @@ function renderRecipeDetail() {
           <button id="delete-recipe-button" class="ghost-button danger-button" type="button">Delete</button>
         </div>
       </div>
+      <div class="star-rating" role="group" aria-label="Rate this recipe">
+        <button type="button" class="star-button" data-value="1" aria-label="Rate 1 star">★</button>
+        <button type="button" class="star-button" data-value="2" aria-label="Rate 2 stars">★</button>
+        <button type="button" class="star-button" data-value="3" aria-label="Rate 3 stars">★</button>
+        <button type="button" class="star-button" data-value="4" aria-label="Rate 4 stars">★</button>
+        <button type="button" class="star-button" data-value="5" aria-label="Rate 5 stars">★</button>
+      </div>
       ${sourceLinkMarkup}
       ${servingsControlMarkup}
       <p>${escapeHtml(recipe.description || "Saved from the source page and ready for weekly planning.")}</p>
@@ -810,6 +822,7 @@ function renderRecipeDetail() {
   elements.recipeDetail
     .querySelector("#delete-recipe-button")
     .addEventListener("click", () => handleDeleteRecipe(recipe.id));
+  bindStarRating(elements.recipeDetail.querySelector(".star-rating"), recipe);
 
   const servingsInput = elements.recipeDetail.querySelector("#servings-input");
   servingsInput?.addEventListener("change", (event) => {
@@ -1037,6 +1050,68 @@ function setDesiredServings(recipeId, rawValue) {
 
 function persistDesiredServings() {
   localStorage.setItem(STORAGE_KEYS.desiredServings, JSON.stringify(state.desiredServingsByRecipe));
+}
+
+// Lights up stars 1..rating and wires each button to set that value.
+// Clicking the currently-set star again clears the rating back to 0.
+function bindStarRating(container, recipe) {
+  if (!container) {
+    return;
+  }
+
+  const rating = recipe.rating || 0;
+  container.querySelectorAll(".star-button").forEach((button) => {
+    const value = Number(button.dataset.value);
+    button.classList.toggle("filled", value <= rating);
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      setRecipeRating(recipe.id, value === rating ? 0 : value);
+    });
+  });
+}
+
+async function setRecipeRating(recipeId, rating) {
+  const recipe = state.recipes.find((entry) => entry.id === recipeId);
+  if (!recipe) {
+    return;
+  }
+
+  const updated = {
+    id: recipeId,
+    title: recipe.title,
+    description: recipe.description,
+    servings: recipe.servings,
+    ingredients: recipe.ingredients,
+    instructions: recipe.instructions,
+    method: recipe.method,
+    image: recipe.image,
+    rating,
+  };
+
+  try {
+    if (IS_HOSTED_APP) {
+      const response = await hostedFetch(`/api/recipes/${encodeURIComponent(recipeId)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not save the rating.");
+      }
+      state.recipes = Array.isArray(payload.recipes) ? payload.recipes : state.recipes;
+    } else {
+      recipe.rating = rating;
+      persistState();
+    }
+
+    renderRecipeLibrary();
+    if (state.selectedRecipeId === recipeId) {
+      renderRecipeDetail();
+    }
+  } catch (error) {
+    setStatus(error.message || "Could not save the rating.");
+  }
 }
 
 function renderStats() {

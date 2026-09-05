@@ -10,7 +10,7 @@ from functools import wraps
 
 from flask import Flask, jsonify, request, send_from_directory, session
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import String, Text
+from sqlalchemy import String, Text, inspect, text
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from recipe_importer import import_recipe_from_url, parse_recipe_html
@@ -83,6 +83,7 @@ class Recipe(db.Model):
     method = db.Column(Text, nullable=False, default="")
     image = db.Column(String(2048), nullable=False, default="")
     servings = db.Column(db.Integer, nullable=True)
+    rating = db.Column(db.Integer, nullable=True)
     imported_at = db.Column(db.DateTime(timezone=True), nullable=False)
 
 
@@ -96,6 +97,14 @@ class PlannerEntry(db.Model):
 
 with app.app_context():
     db.create_all()
+
+    # db.create_all() only creates missing tables, not missing columns on
+    # tables that already exist, so a column added after the first deploy
+    # needs its own lightweight migration here.
+    existing_columns = {column["name"] for column in inspect(db.engine).get_columns("recipes")}
+    if "rating" not in existing_columns:
+        with db.engine.begin() as connection:
+            connection.execute(text("ALTER TABLE recipes ADD COLUMN rating INTEGER"))
 
 
 def current_user_id() -> str | None:
@@ -312,6 +321,7 @@ def save_recipe(recipe_data: dict, owner_id: str) -> Recipe:
     recipe.method = str(recipe_data.get("method") or "")
     recipe.image = str(recipe_data.get("image") or "")
     recipe.servings = normalize_servings(recipe_data.get("servings"))
+    recipe.rating = normalize_rating(recipe_data.get("rating"))
     if not recipe.imported_at:
         recipe.imported_at = datetime.now(timezone.utc)
 
@@ -339,6 +349,7 @@ def serialize_recipe(recipe: Recipe) -> dict:
         "method": recipe.method,
         "image": recipe.image,
         "servings": recipe.servings,
+        "rating": recipe.rating or 0,
         "importedAt": recipe.imported_at.isoformat() if recipe.imported_at else "",
     }
 
@@ -358,6 +369,14 @@ def normalize_servings(value: object) -> int | None:
     return servings if servings > 0 else None
 
 
+def normalize_rating(value: object) -> int | None:
+    try:
+        rating = int(value)
+    except (TypeError, ValueError):
+        return None
+    return min(max(rating, 0), 5)
+
+
 def sanitize_recipe_payload(payload: dict) -> dict:
     return {
         "id": str(payload.get("id") or ""),
@@ -369,6 +388,7 @@ def sanitize_recipe_payload(payload: dict) -> dict:
         "method": str(payload.get("method") or ""),
         "image": str(payload.get("image") or ""),
         "servings": normalize_servings(payload.get("servings")),
+        "rating": normalize_rating(payload.get("rating")),
     }
 
 
