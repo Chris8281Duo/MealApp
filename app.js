@@ -26,9 +26,22 @@ const WEEK_DAYS = [
   "Sunday",
 ];
 
+// crypto.randomUUID() is only defined in secure contexts (HTTPS or
+// http://localhost), so plain-HTTP LAN/hosted access needs a fallback.
+function generateId() {
+  if (window.crypto?.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (char) => {
+    const random = (Math.random() * 16) | 0;
+    const value = char === "x" ? random : (random & 0x3) | 0x8;
+    return value.toString(16);
+  });
+}
+
 const demoRecipes = [
   {
-    id: crypto.randomUUID(),
+    id: generateId(),
     title: "One-Pan Tomato Basil Gnocchi",
     sourceUrl: "https://demo.local/gnocchi",
     description: "A quick weeknight pasta-style dinner with soft gnocchi and tomato sauce.",
@@ -54,7 +67,7 @@ const demoRecipes = [
     importedAt: new Date().toISOString(),
   },
   {
-    id: crypto.randomUUID(),
+    id: generateId(),
     title: "Coconut Chickpea Curry",
     sourceUrl: "https://demo.local/chickpea-curry",
     description: "Comforting curry with pantry ingredients and a bright finish.",
