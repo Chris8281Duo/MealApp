@@ -970,7 +970,7 @@ function updateShoppingTotalDisplay() {
     return Number.isFinite(price) ? sum + price : sum;
   }, 0);
 
-  elements.shoppingTotal.textContent = `$${total.toFixed(2)}`;
+  elements.shoppingTotal.textContent = `£${total.toFixed(2)}`;
 }
 
 function getPlannerSignature() {
