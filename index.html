@@ -45,6 +45,14 @@
       </section>
 
       <div id="app-shell">
+        <nav class="app-nav" aria-label="Jump to section">
+          <a href="#import-panel">Import</a>
+          <a href="#planner-panel">Plan the week</a>
+          <a href="#library-panel">Recipe library</a>
+          <a href="#shopping-panel">Shopping list</a>
+          <a href="#details-panel">Recipe details</a>
+        </nav>
+
         <header class="hero">
           <div class="hero-copy">
             <div class="hero-badge-row">
@@ -91,7 +99,7 @@
         </header>
 
         <main class="main-grid">
-        <section class="panel import-panel">
+        <section class="panel import-panel" id="import-panel">
           <div class="panel-heading">
             <div>
               <p class="kicker">Import recipe</p>
@@ -129,7 +137,7 @@
           </form>
         </section>
 
-        <section class="panel planner-panel">
+        <section class="panel planner-panel" id="planner-panel">
           <div class="panel-heading">
             <div>
               <p class="kicker">Meal planner</p>
@@ -141,17 +149,23 @@
         </section>
 
         <section class="library-column">
-          <section class="panel library-panel">
+          <section class="panel library-panel" id="library-panel">
             <div class="panel-heading">
               <div>
                 <p class="kicker">Recipe library</p>
                 <h2>Your saved recipes</h2>
               </div>
             </div>
+            <input
+              type="search"
+              id="recipe-search"
+              class="recipe-search"
+              placeholder="Search your recipes..."
+            />
             <div id="recipe-library" class="recipe-library"></div>
           </section>
 
-          <section class="panel shopping-panel">
+          <section class="panel shopping-panel" id="shopping-panel">
             <div class="panel-heading">
               <div>
                 <p class="kicker">Shopping list</p>
@@ -166,7 +180,7 @@
           </section>
         </section>
 
-        <section class="panel details-panel">
+        <section class="panel details-panel" id="details-panel">
           <div class="panel-heading">
             <div>
               <p class="kicker">Recipe page</p>

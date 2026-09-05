@@ -117,6 +117,7 @@ const elements = {
   shareStatus: document.querySelector("#share-status"),
   loadDemoButton: document.querySelector("#load-demo-button"),
   shareBoardButton: document.querySelector("#share-board-button"),
+  recipeSearch: document.querySelector("#recipe-search"),
   recipeLibrary: document.querySelector("#recipe-library"),
   recipeDetail: document.querySelector("#recipe-detail"),
   weeklyMenu: document.querySelector("#weekly-menu"),
@@ -152,6 +153,7 @@ let state = {
 let currentShoppingItems = [];
 
 let authMode = "login";
+let recipeSearchTerm = "";
 
 initializeApp();
 
@@ -196,6 +198,10 @@ function bindEvents() {
   elements.authForm.addEventListener("submit", handleAuthSubmit);
   elements.authToggleMode.addEventListener("click", handleAuthToggleMode);
   elements.logoutButton.addEventListener("click", handleLogout);
+  elements.recipeSearch.addEventListener("input", (event) => {
+    recipeSearchTerm = event.target.value.trim().toLowerCase();
+    renderRecipeLibrary();
+  });
 }
 
 function showApp() {
@@ -713,7 +719,17 @@ function renderRecipeLibrary() {
     return;
   }
 
-  state.recipes.forEach((recipe) => {
+  const filteredRecipes = recipeSearchTerm
+    ? state.recipes.filter((recipe) => recipe.title.toLowerCase().includes(recipeSearchTerm))
+    : state.recipes;
+
+  if (!filteredRecipes.length) {
+    elements.recipeLibrary.classList.add("empty-state");
+    elements.recipeLibrary.textContent = "No recipes match your search.";
+    return;
+  }
+
+  filteredRecipes.forEach((recipe) => {
     const node = elements.recipeCardTemplate.content.firstElementChild.cloneNode(true);
     node.querySelector(".recipe-card-title").textContent = recipe.title;
     node.querySelector(".recipe-card-meta").textContent = `${recipe.ingredients.length} ingredients | ${recipe.instructions.length} steps`;
