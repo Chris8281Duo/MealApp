@@ -62,15 +62,15 @@ def validate_recipe_url(url: str) -> str:
     return url
 
 
-def ensure_hostname_is_public(hostname: str) -> None:
+def ensure_hostname_is_public(hostname: str, url_label: str = "recipe URL") -> None:
     try:
         infos = socket.getaddrinfo(hostname, None)
     except socket.gaierror:
-        raise ValueError("That recipe URL could not be resolved.")
+        raise ValueError(f"That {url_label} could not be resolved.")
 
     addresses = {info[4][0] for info in infos}
     if not addresses:
-        raise ValueError("That recipe URL could not be resolved.")
+        raise ValueError(f"That {url_label} could not be resolved.")
 
     for address in addresses:
         ip = ipaddress.ip_address(address)
@@ -82,7 +82,7 @@ def ensure_hostname_is_public(hostname: str) -> None:
             or ip.is_reserved
             or ip.is_unspecified
         ):
-            raise ValueError("That recipe URL points to a restricted address.")
+            raise ValueError(f"That {url_label} points to a restricted address.")
 
 
 def extract_recipe_from_json_ld(soup: BeautifulSoup, source_url: str) -> dict | None:
