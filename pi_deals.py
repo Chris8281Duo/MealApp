@@ -6,6 +6,8 @@ from urllib.parse import urljoin, urlparse
 import requests
 from bs4 import BeautifulSoup
 
+from recipe_importer import MAX_REDIRECTS, ensure_hostname_is_public
+
 
 DEFAULT_DEAL_THRESHOLD = 0.15
 
@@ -88,16 +90,33 @@ def find_deals_from_url(
     value_overrides: dict[str, float] | None = None,
 ) -> dict:
     validated_url = validate_listing_url(url)
-    response = requests.get(
-        validated_url,
-        headers={
-            "Accept": "text/html,application/xhtml+xml",
-            "User-Agent": "Mozilla/5.0 (compatible; PiDealFinder/1.0)",
-        },
-        timeout=20,
-    )
-    response.raise_for_status()
-    return find_deals_from_html(response.text, validated_url, threshold, value_overrides)
+    final_url, html = fetch_listing_url(validated_url)
+    return find_deals_from_html(html, final_url, threshold, value_overrides)
+
+
+def fetch_listing_url(url: str) -> tuple[str, str]:
+    current_url = url
+
+    for _ in range(MAX_REDIRECTS + 1):
+        response = requests.get(
+            current_url,
+            headers={
+                "Accept": "text/html,application/xhtml+xml",
+                "User-Agent": "Mozilla/5.0 (compatible; PiDealFinder/1.0)",
+            },
+            timeout=20,
+            allow_redirects=False,
+        )
+
+        location = response.headers.get("Location")
+        if response.is_redirect and location:
+            current_url = validate_listing_url(urljoin(current_url, location))
+            continue
+
+        response.raise_for_status()
+        return current_url, response.text
+
+    raise ValueError("That listings URL redirected too many times.")
 
 
 def find_deals_from_html(
@@ -117,9 +136,10 @@ def validate_listing_url(url: str) -> str:
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"}:
         raise ValueError("Only http and https listing URLs are supported.")
-    if not parsed.netloc:
+    if not parsed.hostname:
         raise ValueError("That listings URL is not valid.")
 
+    ensure_hostname_is_public(parsed.hostname, url_label="listings URL")
     return url
 
 

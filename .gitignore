@@ -1,4 +1,9 @@
 __pycache__/
 *.pyc
-tableset.db
 .venv/
+venv/
+env/
+*.db
+.env
+.DS_Store
+node_modules/

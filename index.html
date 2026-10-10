@@ -8,53 +8,99 @@
   </head>
   <body>
     <div class="page-shell">
-      <header class="hero">
-        <div class="hero-copy">
-          <div class="hero-badge-row">
-            <p class="eyebrow">Recipe library + weekly meal planning</p>
-            <span class="season-tag">Kitchen notebook</span>
-          </div>
-          <h1>Turn recipe links into a warm, lived-in food plan.</h1>
-          <p class="hero-text">
-            Keep the recipes you love, shape a week of comforting meals, and let the
-            shopping list gather itself as your table starts to take shape.
-          </p>
-          <div class="hero-notes">
-            <div class="hero-note">
-              <span class="hero-note-label">This week</span>
-              <strong>Choose dinners for every day</strong>
-            </div>
-            <div class="hero-note">
-              <span class="hero-note-label">Shopping</span>
-              <strong>Shared ingredients merge together</strong>
-            </div>
-          </div>
-          <div class="hero-actions">
-            <button id="share-board-button" class="ghost-button" type="button">Create share link</button>
-            <p id="share-status" class="status-text" aria-live="polite"></p>
-          </div>
-        </div>
-        <div class="hero-stat-grid">
-          <section class="hero-stat">
-            <span class="stat-label">Recipes saved</span>
-            <strong id="recipe-count">0</strong>
-          </section>
-          <section class="hero-stat">
-            <span class="stat-label">Meals planned</span>
-            <strong id="planned-count">0</strong>
-          </section>
-          <section class="hero-stat">
-            <span class="stat-label">Shopping items</span>
-            <strong id="shopping-count">0</strong>
-          </section>
-          <section class="hero-card">
-            <p>Built to feel like a recipe box, meal board, and handwritten shopping list in one place.</p>
-          </section>
-        </div>
-      </header>
+      <div id="user-bar" class="user-bar hidden">
+        <span id="user-email"></span>
+        <button id="logout-button" class="ghost-button" type="button">Log out</button>
+      </div>
 
-      <main class="main-grid">
-        <section class="panel import-panel">
+      <section id="auth-panel" class="panel auth-panel hidden">
+        <div class="panel-heading">
+          <div>
+            <p class="kicker">Account</p>
+            <h2 id="auth-heading">Sign in to your meal board</h2>
+          </div>
+          <button id="auth-toggle-mode" class="ghost-button" type="button">Need an account? Register</button>
+        </div>
+        <form id="auth-form" class="import-form">
+          <label class="field">
+            <span>Email</span>
+            <input id="auth-email" name="email" type="email" required autocomplete="username" />
+          </label>
+          <label class="field">
+            <span>Password</span>
+            <input
+              id="auth-password"
+              name="password"
+              type="password"
+              required
+              minlength="8"
+              autocomplete="current-password"
+            />
+          </label>
+          <div class="import-actions">
+            <button id="auth-submit" class="primary-button" type="submit">Sign in</button>
+            <p id="auth-status" class="status-text" aria-live="polite"></p>
+          </div>
+        </form>
+      </section>
+
+      <div id="app-shell">
+        <nav class="app-nav" aria-label="Jump to section">
+          <a href="#import-panel">Import</a>
+          <a href="#planner-panel">Plan the week</a>
+          <a href="#library-panel">Recipe library</a>
+          <a href="#shopping-panel">Shopping list</a>
+          <a href="#details-panel">Recipe details</a>
+          <a href="#pi-deals-panel">Pi deal finder</a>
+        </nav>
+
+        <header class="hero">
+          <div class="hero-copy">
+            <div class="hero-badge-row">
+              <p class="eyebrow">Recipe library + weekly meal planning</p>
+              <span class="season-tag">Kitchen notebook</span>
+            </div>
+            <h1>Turn recipe links into a warm, lived-in food plan.</h1>
+            <p class="hero-text">
+              Keep the recipes you love, shape a week of comforting meals, and let the
+              shopping list gather itself as your table starts to take shape.
+            </p>
+            <div class="hero-notes">
+              <div class="hero-note">
+                <span class="hero-note-label">This week</span>
+                <strong>Choose dinners for every day</strong>
+              </div>
+              <div class="hero-note">
+                <span class="hero-note-label">Shopping</span>
+                <strong>Shared ingredients merge together</strong>
+              </div>
+            </div>
+            <div class="hero-actions">
+              <button id="share-board-button" class="ghost-button" type="button">Create share link</button>
+              <p id="share-status" class="status-text" aria-live="polite"></p>
+            </div>
+          </div>
+          <div class="hero-stat-grid">
+            <section class="hero-stat">
+              <span class="stat-label">Recipes saved</span>
+              <strong id="recipe-count">0</strong>
+            </section>
+            <section class="hero-stat">
+              <span class="stat-label">Meals planned</span>
+              <strong id="planned-count">0</strong>
+            </section>
+            <section class="hero-stat">
+              <span class="stat-label">Shopping items</span>
+              <strong id="shopping-count">0</strong>
+            </section>
+            <section class="hero-card">
+              <p>Built to feel like a recipe box, meal board, and handwritten shopping list in one place.</p>
+            </section>
+          </div>
+        </header>
+
+        <main class="main-grid">
+        <section class="panel import-panel" id="import-panel">
           <div class="panel-heading">
             <div>
               <p class="kicker">Import recipe</p>
@@ -92,7 +138,7 @@
           </form>
         </section>
 
-        <section class="panel planner-panel">
+        <section class="panel planner-panel" id="planner-panel">
           <div class="panel-heading">
             <div>
               <p class="kicker">Meal planner</p>
@@ -100,32 +146,62 @@
             </div>
           </div>
 
+          <div class="household-settings">
+            <label class="field-inline">
+              <span>Adults</span>
+              <input type="number" id="household-adults" min="0" value="0" />
+            </label>
+            <label class="field-inline">
+              <span>Children</span>
+              <input type="number" id="household-children" min="0" value="0" />
+            </label>
+            <label class="checkbox-field">
+              <input type="checkbox" id="household-children-share" />
+              Children share a parent's portion instead of having their own
+            </label>
+            <p class="household-hint">
+              Recipes default to serving
+              <strong id="household-total">&mdash;</strong>
+              based on your household, unless you set a different amount on a recipe.
+            </p>
+          </div>
+
           <div id="weekly-menu" class="weekly-menu"></div>
         </section>
 
         <section class="library-column">
-          <section class="panel library-panel">
+          <section class="panel library-panel" id="library-panel">
             <div class="panel-heading">
               <div>
                 <p class="kicker">Recipe library</p>
                 <h2>Your saved recipes</h2>
               </div>
             </div>
+            <input
+              type="search"
+              id="recipe-search"
+              class="recipe-search"
+              placeholder="Search your recipes..."
+            />
             <div id="recipe-library" class="recipe-library"></div>
           </section>
 
-          <section class="panel shopping-panel">
+          <section class="panel shopping-panel" id="shopping-panel">
             <div class="panel-heading">
               <div>
                 <p class="kicker">Shopping list</p>
                 <h2>Auto-generated ingredients</h2>
               </div>
+              <span id="shopping-total" class="shopping-total">£0.00</span>
             </div>
+            <p class="shopping-hint">
+              Already have something at home? Remove it from the list and the total updates.
+            </p>
             <div id="shopping-list" class="shopping-list"></div>
           </section>
         </section>
 
-        <section class="panel details-panel">
+        <section class="panel details-panel" id="details-panel">
           <div class="panel-heading">
             <div>
               <p class="kicker">Recipe page</p>
@@ -138,7 +214,7 @@
           </article>
         </section>
 
-        <section class="panel pi-deals-panel">
+        <section class="panel pi-deals-panel" id="pi-deals-panel">
           <div class="panel-heading">
             <div>
               <p class="kicker">Bonus tool</p>
@@ -203,20 +279,42 @@
             Scan a listings page to see boards and kits priced below their typical market value.
           </div>
         </section>
-      </main>
+        </main>
+      </div>
     </div>
 
     <template id="recipe-card-template">
-      <button class="recipe-card" type="button">
-        <span class="recipe-card-title"></span>
-        <span class="recipe-card-meta"></span>
-      </button>
+      <div class="recipe-card">
+        <button class="recipe-card-select" type="button">
+          <span class="recipe-card-title"></span>
+          <span class="recipe-card-meta"></span>
+        </button>
+        <div class="star-rating recipe-card-rating" role="group" aria-label="Rate this recipe">
+          <button type="button" class="star-button" data-value="1" aria-label="Rate 1 star">★</button>
+          <button type="button" class="star-button" data-value="2" aria-label="Rate 2 stars">★</button>
+          <button type="button" class="star-button" data-value="3" aria-label="Rate 3 stars">★</button>
+          <button type="button" class="star-button" data-value="4" aria-label="Rate 4 stars">★</button>
+          <button type="button" class="star-button" data-value="5" aria-label="Rate 5 stars">★</button>
+        </div>
+        <label class="recipe-card-servings">
+          Serves
+          <input type="number" class="recipe-card-servings-input" min="1" />
+        </label>
+      </div>
     </template>
 
     <template id="shopping-item-template">
       <li class="shopping-item">
-        <span class="shopping-item-name"></span>
-        <span class="shopping-item-count"></span>
+        <div class="shopping-item-main">
+          <span class="shopping-item-name"></span>
+          <span class="shopping-item-count"></span>
+        </div>
+        <label class="shopping-item-price">
+          <span>£</span>
+          <input type="number" class="price-input" step="0.01" min="0" inputmode="decimal" placeholder="0.00" />
+        </label>
+        <button class="remove-item-button ghost-button" type="button">Remove</button>
+        <button class="restore-item-button ghost-button" type="button" hidden>Add back</button>
       </li>
     </template>
 
@@ -246,6 +344,6 @@
       </article>
     </template>
 
-    <script src="./app.js"></script>
+    <script type="module" src="./app.js"></script>
   </body>
 </html>
